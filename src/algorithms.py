@@ -49,8 +49,9 @@ class OffPolicyAlgorithm(Algorithm):
             make_critic_checkpoint=False, restore_from_checkpoint=None,
             return_viewer=False):
         super(OffPolicyAlgorithm, self).__init__(
-            environment, agent, replay_buffer, training_steps, evaluate_every, train_every,
-            batch_size, make_critic_checkpoint, restore_from_checkpoint
+            environment, agent, replay_buffer, training_steps, evaluate_every,
+            train_every, batch_size, make_critic_checkpoint,
+            restore_from_checkpoint
         )
         self.return_viewer = ReturnViewer() if return_viewer else False
         self.episode_counter = tf.Variable(0, name="episode_counter")

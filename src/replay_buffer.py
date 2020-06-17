@@ -75,3 +75,24 @@ class SimpleReplayBuffer(ReplayBuffer):
             part2 = self.buffer[:batch_last - self.current_last]
             self.sample_index = batch_last - self.current_last
             return np.concatenate((part1, part2))
+
+
+if __name__ == "__main__":
+    def test_simple_replay_buffer():
+        replay = SimpleReplayBuffer(16)
+
+        all_states = np.arange(100 * 3, dtype=np.float32).reshape((20, 5, 3))
+        all_actions = np.arange(100 * 2, dtype=np.float32).reshape((20, 5, 2))
+        all_returns = np.arange(100 * 1, dtype=np.float32).reshape((20, 5, ))
+        all_dones = np.zeros((20, 5), dtype=np.bool)
+
+        for states, actions, returns, dones in zip(all_states, all_actions, all_returns, all_dones):
+            replay.register_episode(states, actions, returns, dones)
+            print(replay.buffer)
+            print("")
+            print(replay.sample(5))
+            print("")
+            print(replay.sample(5))
+            print("\n\n\n")
+
+    test_simple_replay_buffer()
