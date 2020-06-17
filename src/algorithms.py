@@ -3,6 +3,7 @@ import tensorflow as tf
 from return_viewer import ReturnViewer
 
 
+
 class Algorithm(object):
     def __init__(self, environment, agent, replay_buffer, training_steps=0,
             evaluate_every=0, train_every=100, batch_size=100,
