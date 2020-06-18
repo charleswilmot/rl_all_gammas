@@ -83,4 +83,4 @@ def ssh_command(cmd):
 
 
 if __name__ == "__main__":
-    run_on_cluster()
+    send_job()
