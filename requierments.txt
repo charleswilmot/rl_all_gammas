@@ -2,4 +2,4 @@ tensorflow
 tensorflow_probability
 matplotlib
 gym[box2d]
-hydra
+hydra-core
