@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 #SBATCH --mincpus 4
 #SBATCH --mem 4000
 
