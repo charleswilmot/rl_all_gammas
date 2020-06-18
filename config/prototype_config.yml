@@ -1,18 +1,19 @@
 agent:
   class: TD3Agent
-  gamma: 0.9
+  gamma: 0.99
   critic_learning_rate: 1e-3
   actor_learning_rate: 2e-4
   policy_model: type1
   critic_model: type1
   noise_stddev: 0.1
+  reward_sacling_factor: 100
 
 replay_buffer:
   class: SimpleReplayBuffer
   size: 10000
 
 environment:
-  env_id: HalfCheetah-v2
+  env_id: LunarLanderContinuous-v2
   seed: 0
   monitor: False
 
@@ -24,7 +25,7 @@ algorithm:
   batch_size: 512
   make_critic_checkpoint: False
   restore_from_checkpoint: False
-  return_viewer: False
+  return_viewer: True
 
 hydra:
   run:

@@ -1,21 +1,43 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from time import time
 
 
-plt.ion()
+# plt.ion()
 
 
 class ReturnViewer(object):
-    def __init__(self, lookback=100):
+    def __init__(self, lookback=100, min_refresh_interval=1):
         self._fig = plt.figure()
         self._fig_shawn = False
         self._ax = self._fig.add_subplot(111)
         self._return_line = None
         self._estimated_return_line = None
         self._lookback = lookback
+        self._min_refresh_interval = min_refresh_interval
+        self._last_refresh_timestamp = time()
 
 
     def __call__(self, returns, estimated_returns):
+        timestamp = time()
+        interval = timestamp - self._last_refresh_timestamp
+        if interval < self._min_refresh_interval:
+            return
+        else:
+            self._last_refresh_timestamp = timestamp
+        size = returns.shape[0]
+        if size < self._lookback:
+            returns = np.pad(
+                returns,
+                (self._lookback - size, 0),
+                # constant_values=np.nan
+            )
+            estimated_returns = np.pad(
+                estimated_returns,
+                (self._lookback - size, 0),
+                # constant_values=np.nan
+            )
+        print(returns.shape, estimated_returns.shape)
         returns = returns[-self._lookback:]
         estimated_returns = estimated_returns[-self._lookback:]
         if self._return_line is None:

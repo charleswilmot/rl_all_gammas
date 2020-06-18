@@ -42,7 +42,7 @@ class Agent(object):
         for i, reward in zip(np.arange(last, -1, -1), rewards[::-1]):
             returns[i] = self.gamma * previous + reward
             previous = returns[i]
-        return returns
+        return returns / self.reward_sacling_factor
 
     @tf.function
     def train(self, states, actions, target_returns):
@@ -52,7 +52,8 @@ class Agent(object):
 
 class TD3Agent(Agent):
     def __init__(self, environment, policy_model, critic_model,
-            critic_learning_rate, actor_learning_rate, gamma, noise_stddev):
+            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
+            reward_sacling_factor):
         super(TD3Agent, self).__init__(environment)
         self.policy_model = get_policy_model(policy_model, self.action_space_dim)
         self.critic_model_1 = get_critic_model(critic_model)
@@ -61,6 +62,7 @@ class TD3Agent(Agent):
         self.actor_learning_rate = actor_learning_rate
         self.gamma = gamma
         self.noise_stddev = noise_stddev
+        self.reward_sacling_factor = reward_sacling_factor
         self.critic_optimizer = keras.optimizers.Adam(self.critic_learning_rate)
         self.actor_optimizer = keras.optimizers.Adam(self.actor_learning_rate)
 
