@@ -23,8 +23,7 @@ def run_on_cluster():
         send_job()
 
 
-# @hydra.main(config_path='../config/prototype_config.yml')
-@hydra.main(config_path='../config/')
+@hydra.main(config_path='/home/wilmot/Documents/code/rl_all_gammas/config/prototype_config.yml')
 def send_job(cfg):
         command_line_args = serialize_cfg(cfg)
         command_line_args += additional_args()
