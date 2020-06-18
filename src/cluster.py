@@ -14,7 +14,7 @@ REMOTE_HOST_NAME = 'otto'
 
 
 def run_on_cluster():
-    print("script started")
+    print("script started", os.getcwd())
     if gethostname() != REMOTE_HOST_NAME:
         cmd = "python3 " + " ".join(sys.argv)
         print(cmd)
