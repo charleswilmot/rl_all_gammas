@@ -13,17 +13,7 @@ PASSWORD = None
 REMOTE_HOST_NAME = 'otto'
 
 
-def run_on_cluster():
-    print("script started", os.getcwd())
-    if gethostname() != REMOTE_HOST_NAME:
-        cmd = "python3 " + " ".join(sys.argv)
-        print(cmd)
-        ssh_command(cmd)
-    else:
-        send_job()
-
-
-@hydra.main(config_path='/home/wilmot/Documents/code/rl_all_gammas/config/prototype_config.yml')
+@hydra.main(config_path='../config/prototype_config.yml')
 def send_job(cfg):
         command_line_args = serialize_cfg(cfg)
         command_line_args += additional_args()
@@ -82,5 +72,7 @@ def ssh_command(cmd):
     print("done")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" and gethostname() == REMOTE_HOST_NAME:
     send_job()
+if __name__ == "__main__" and gethostname() != REMOTE_HOST_NAME:
+    ssh_command("python3 " + " ".join(sys.argv))
