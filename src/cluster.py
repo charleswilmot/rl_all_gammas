@@ -20,11 +20,11 @@ def run_on_cluster():
         print(cmd)
         ssh_command(cmd)
     else:
-        send_job()
+        main()
 
 
 @hydra.main(config_path='../config/prototype_config.yml')
-def send_job(cfg):
+def main(cfg):
         command_line_args = serialize_cfg(cfg)
         command_line_args += additional_args()
         job_name = get_job_name()
