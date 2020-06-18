@@ -30,14 +30,11 @@ class ReturnViewer(object):
             returns = np.pad(
                 returns,
                 (self._lookback - size, 0),
-                # constant_values=np.nan
             )
             estimated_returns = np.pad(
                 estimated_returns,
                 (self._lookback - size, 0),
-                # constant_values=np.nan
             )
-        print(returns.shape, estimated_returns.shape)
         returns = returns[-self._lookback:]
         estimated_returns = estimated_returns[-self._lookback:]
         if self._return_line is None:
