@@ -24,12 +24,11 @@ def send_job(cfg):
         output_flag = "--output {outdir}/%N_%j.log".format(outdir=os.getcwd())
         job_name_flag = "--job-name {job_name}".format(job_name=job_name)
         partition_flag = "--partition {partition}".format(partition="sleuths")
-        path = get_original_cwd()
-        command_line = "sbatch {output_flag} {job_name_flag} {partition_flag} {path}/cluster.sh\\\n".format(
+        os.chdir(get_original_cwd())
+        command_line = "sbatch {output_flag} {job_name_flag} {partition_flag} cluster.sh\\\n".format(
             output_flag=output_flag,
             job_name_flag=job_name_flag,
             partition_flag=partition_flag,
-            path=path
         ) + command_line_args
         print("###")
         print(command_line)
