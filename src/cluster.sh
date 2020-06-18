@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --mincpus 4
 #SBATCH --mem 4000
-#SBATCH --exclude rockford,steele,hammer,conan,blomquist,wolfe
+#SBATCH --exclude rockford,steele,hammer,conan,blomquist,wolfe,knatterton,holmes
 
 ##SBATCH --nodelist=turbine
 
