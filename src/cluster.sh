@@ -3,5 +3,7 @@
 #SBATCH --mem 4000
 
 
-source ~/.software/python_environments/tensorflow_v2/bin/activate
+source $HOME/.software/python_environments/tensorflow_v2/bin/activate
+echo "test"
+pip3 list
 srun -u python3 gym_experiment.py "$@"
