@@ -66,6 +66,16 @@ class TD3Agent(Agent):
         self.reward_sacling_factor = reward_sacling_factor
         self.critic_optimizer = keras.optimizers.Adam(self.critic_learning_rate)
         self.actor_optimizer = keras.optimizers.Adam(self.actor_learning_rate)
+        self._hparams = {
+            # hp.HParam('actor_learning_rate', hp.RealInterval(1e-6, 1e-2))
+            "critic_learning_rate": self.critic_learning_rate,
+            "actor_learning_rate": self.actor_learning_rate,
+            "gamma": self.gamma,
+            "noise_stddev": self.noise_stddev,
+            "reward_sacling_factor": self.reward_sacling_factor,
+            "policy_model": policy_model,
+            "critic_model": critic_model,
+        }
 
     def save_model(self, path):
         self.critic_model_1.save_weights(path + "/critic_model_1")

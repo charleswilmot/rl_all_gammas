@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from tensorboard.plugins.hparams import api as hp
 from return_viewer import ReturnViewer
 
 
@@ -83,6 +84,10 @@ class OffPolicyAlgorithm(Algorithm):
             "testing/total_episode_reward",
             dtype=tf.float32
         )
+        self.testing_mean_total_episode_reward = tf.keras.metrics.Mean(
+            "testing/mean_total_episode_reward",
+            dtype=tf.float32
+        )
 
     def main_loop(self, training_steps, evaluate_every):
         n_done = 0
@@ -137,6 +142,12 @@ class OffPolicyAlgorithm(Algorithm):
                 self.testing_total_episode_reward.result(),
                 step=step
             )
+            tf.summary.scalar(
+                self.testing_mean_total_episode_reward.name,
+                self.testing_mean_total_episode_reward.result(),
+                step=step
+            )
+            hp.hparams(self.agent._hparams)
         self.training_episode_length.reset_states()
         self.training_critic_loss.reset_states()
         self.training_actor_loss.reset_states()
@@ -247,3 +258,4 @@ class OffPolicyAlgorithm(Algorithm):
                 break
         self.testing_episode_length(n_transitions)
         self.testing_total_episode_reward(total_episode_reward)
+        self.testing_mean_total_episode_reward(total_episode_reward)
