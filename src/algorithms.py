@@ -198,23 +198,21 @@ class OffPolicyAlgorithm(Algorithm):
         self.training_episode_length(n_transitions)
         self.episode_counter.assign_add(1)
         if done and n_transitions < max_steps:
-            returns = self.agent.rewards_to_target_returns(
-                rewards[:n_transitions],
-                0
-            )
+            bootstraping_return = 0
         else:
             action = self.agent.get_actions(
                 state[np.newaxis].astype(np.float32),
-                logits=True
+                logits=True,
+                explore=False
             )
             bootstraping_return = self.agent.get_estimated_returns(
                 state[np.newaxis].astype(np.float32),
                 action
-            )
-            returns = self.agent.rewards_to_target_returns(
-                rewards[:n_transitions],
-                bootstraping_return.numpy()[0]
-            )
+            ).numpy()[0]
+        returns = self.agent.rewards_to_target_returns(
+            rewards[:n_transitions],
+            bootstraping_return
+        )
         if self.return_viewer:
             self.return_viewer(returns, estimated_returns[:n_transitions])
         noise = returns - estimated_returns[:n_transitions]

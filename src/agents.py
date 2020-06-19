@@ -37,7 +37,8 @@ class Agent(object):
 
     def rewards_to_target_returns(self, rewards, bootstraping_return):
         returns = np.zeros_like(rewards)
-        previous = bootstraping_return
+        # to reward scale
+        previous = bootstraping_return * self.reward_sacling_factor
         last = rewards.shape[0] - 1
         for i, reward in zip(np.arange(last, -1, -1), rewards[::-1]):
             returns[i] = self.gamma * previous + reward

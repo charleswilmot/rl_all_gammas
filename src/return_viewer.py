@@ -7,7 +7,7 @@ from time import time
 
 
 class ReturnViewer(object):
-    def __init__(self, lookback=100, min_refresh_interval=1):
+    def __init__(self, lookback=500, min_refresh_interval=0.5):
         self._fig = plt.figure()
         self._fig_shawn = False
         self._ax = self._fig.add_subplot(111)
@@ -16,7 +16,9 @@ class ReturnViewer(object):
         self._lookback = lookback
         self._min_refresh_interval = min_refresh_interval
         self._last_refresh_timestamp = time()
-
+        self._min_y_lim = None
+        self._max_y_lim = None
+        self._lim_decay = 0.95
 
     def __call__(self, returns, estimated_returns):
         timestamp = time()
@@ -30,10 +32,12 @@ class ReturnViewer(object):
             returns = np.pad(
                 returns,
                 (self._lookback - size, 0),
+                constant_values=returns[0]
             )
             estimated_returns = np.pad(
                 estimated_returns,
                 (self._lookback - size, 0),
+                constant_values=estimated_returns[0]
             )
         returns = returns[-self._lookback:]
         estimated_returns = estimated_returns[-self._lookback:]
@@ -54,9 +58,15 @@ class ReturnViewer(object):
         else:
             self._return_line.set_ydata(returns)
             self._estimated_return_line.set_ydata(estimated_returns)
-            mini = min(np.min(returns), np.min(estimated_returns))
-            maxi = max(np.max(returns), np.max(estimated_returns))
-            self._ax.set_ylim([mini - 0.1, maxi + 0.1])
+            mini = min(np.min(returns), np.min(estimated_returns)) - 0.1
+            maxi = max(np.max(returns), np.max(estimated_returns)) + 0.1
+            if self._min_y_lim is None:
+                self._min_y_lim = mini
+            if self._max_y_lim is None:
+                self._max_y_lim = maxi
+            self._min_y_lim = min(self._min_y_lim * self._lim_decay, mini)
+            self._max_y_lim = max(self._max_y_lim * self._lim_decay, maxi)
+            self._ax.set_ylim([self._min_y_lim, self._max_y_lim])
         if self._fig_shawn:
             self._fig.canvas.draw()
             self._fig.canvas.flush_events()
