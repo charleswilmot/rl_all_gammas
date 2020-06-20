@@ -59,6 +59,10 @@ class OffPolicyAlgorithm(Algorithm):
         self.episode_counter = tf.Variable(0, name="episode_counter")
         self.train_step_counter = tf.Variable(0, name="train_step")
         self.global_step = self.train_step_counter
+        self._hparams = {
+            "train_every": self.train_every,
+            "batch_size": self.batch_size
+        }
         # define a few metrics to keep track of
         self.training_episode_length = tf.keras.metrics.Mean(
             "training/episode_length",
@@ -147,7 +151,8 @@ class OffPolicyAlgorithm(Algorithm):
                 self.testing_mean_total_episode_reward.result(),
                 step=step
             )
-            hp.hparams(self.agent._hparams)
+            hparams = {**self.agent._hparams, **self._hparams}
+            hp.hparams(hparams)
         self.training_episode_length.reset_states()
         self.training_critic_loss.reset_states()
         self.training_actor_loss.reset_states()
