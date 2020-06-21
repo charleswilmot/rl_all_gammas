@@ -8,8 +8,6 @@ from socket import gethostname
 import sys
 
 
-print("imports succesful")
-
 PASSWORD = None
 REMOTE_HOST_NAME = 'otto'
 
@@ -30,9 +28,6 @@ def send_job(cfg):
             job_name_flag=job_name_flag,
             partition_flag=partition_flag,
         ) + command_line_args
-        print("###")
-        print(command_line)
-        print("###")
         os.system(command_line)
 
 
@@ -65,13 +60,11 @@ def ssh_command(cmd):
         PASSWORD = getpass("Please enter password for the rsa key .ssh/id_rsa\n")
     pkey = RSAKey.from_private_key_file("/home/cwilmot/.ssh/id_rsa", password=PASSWORD)
     client.connect(host, username=user, pkey=pkey)
-    print("ssh comand ", cmd)
     stdin, stdout, stderr = client.exec_command('(cd Documents/code/rl_all_gammas/src ; source $HOME/.software/python_environments/tensorflow_v2/bin/activate ; {})'.format(cmd))
     for line in stdout.readlines():
         print(line)
     for line in stderr.readlines():
         print(line)
-    print("done")
 
 
 if __name__ == "__main__" and gethostname() == REMOTE_HOST_NAME:
