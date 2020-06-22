@@ -29,7 +29,7 @@ algorithm:
 
 hydra:
   run:
-    dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}
+    dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}_${environment.env_id}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}
   sweep:
     dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}/
-    subdir: job${hydra.job.num}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}
+    subdir: job${hydra.job.num}_${environment.env_id}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}

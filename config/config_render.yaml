@@ -1,0 +1,9 @@
+n_episodes: 10
+experiment_path: ???
+
+hydra:
+  run:
+    dir: ../renderings/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: ../renderings/${now:%Y-%m-%d}/${now:%H-%M-%S}/
+    subdir: job${hydra.job.num}
