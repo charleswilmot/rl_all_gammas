@@ -25,7 +25,7 @@ algorithm:
   batch_size: 128
   make_critic_checkpoint: False
   restore_from_checkpoint: False
-  return_viewer: True
+  return_viewer: False
 
 hydra:
   run:

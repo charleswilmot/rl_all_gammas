@@ -12,7 +12,7 @@ PASSWORD = None
 REMOTE_HOST_NAME = 'otto'
 
 
-@hydra.main(config_path='../config/prototype_config.yml')
+@hydra.main(config_path='../config/config.yaml')
 def send_job(cfg):
         command_line_args = serialize_cfg(cfg)
         command_line_args += additional_args()
@@ -62,9 +62,10 @@ def ssh_command(cmd):
     client.connect(host, username=user, pkey=pkey)
     stdin, stdout, stderr = client.exec_command('(cd Documents/code/rl_all_gammas/src ; source $HOME/.software/python_environments/tensorflow_v2/bin/activate ; {})'.format(cmd))
     for line in stdout.readlines():
-        print(line)
+        print(line, end='')
     for line in stderr.readlines():
-        print(line)
+        print(line, end='')
+    print("")
 
 
 if __name__ == "__main__" and gethostname() == REMOTE_HOST_NAME:

@@ -5,7 +5,7 @@ from replay_buffer import ReplayBuffer
 import hydra
 
 
-@hydra.main(config_path='../config/prototype_config.yml')
+@hydra.main(config_path='../config/config.yaml')
 def main(cfg):
     print(cfg.pretty(), end="\n\n\n")
     environment = get_environment(**cfg["environment"])

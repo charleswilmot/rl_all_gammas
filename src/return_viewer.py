@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from time import time
 
 
-# plt.ion()
+plt.ion()
 
 
 class ReturnViewer(object):
@@ -77,17 +77,21 @@ class ReturnViewer(object):
 
 
 if __name__ == '__main__':
-    import time
+    from time import sleep
 
-    plt.ion()
+    # plt.ion()
     rv = ReturnViewer()
 
     if rv:
         print("yeeeeeees")
 
-    for i in range(10):
+    for i in range(1000):
         rv(
-            np.random.uniform(size=50),
-            np.random.uniform(size=50)
+            np.random.uniform(size=500),
+            np.random.uniform(size=500)
         )
-        time.sleep(1)
+        sleep(0.1)
+        if i % 100 == 99:
+            print("pause start")
+            sleep(10)
+            print("pause stop")
