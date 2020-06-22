@@ -19,7 +19,7 @@ def send_job(cfg):
         job_name = get_job_name()
         # print(command_line_args)
         # print(job_name)
-        output_flag = "--output {outdir}/%N_%j.log".format(outdir=os.getcwd())
+        output_flag = "--output {outdir}/%N_%j.joblog".format(outdir=os.getcwd())
         job_name_flag = "--job-name {job_name}".format(job_name=job_name)
         partition_flag = "--partition {partition}".format(partition="sleuths")
         os.chdir(get_original_cwd())
