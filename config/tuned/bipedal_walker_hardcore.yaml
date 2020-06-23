@@ -13,7 +13,7 @@ replay_buffer:
   size: 10000
 
 environment:
-  env_id: BipedalWalkerHardcore-v2
+  env_id: BipedalWalkerHardcore-v3
   seed: 0
   monitor: False
 
@@ -26,10 +26,3 @@ algorithm:
   make_critic_checkpoint: False
   restore_from_checkpoint: False
   return_viewer: False
-
-hydra:
-  run:
-    dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}
-  sweep:
-    dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}/
-    subdir: job${hydra.job.num}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}
