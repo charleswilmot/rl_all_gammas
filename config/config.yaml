@@ -6,7 +6,7 @@ agent:
   policy_model: type1
   critic_model: type1
   noise_stddev: 0.1
-  reward_sacling_factor: 100
+  reward_scaling_factor: 100
 
 replay_buffer:
   class: SimpleReplayBuffer

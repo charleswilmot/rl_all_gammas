@@ -38,12 +38,12 @@ class Agent(object):
     def rewards_to_target_returns(self, rewards, bootstraping_return):
         returns = np.zeros_like(rewards)
         # to reward scale
-        previous = bootstraping_return * self.reward_sacling_factor
+        previous = bootstraping_return * self.reward_scaling_factor
         last = rewards.shape[0] - 1
         for i, reward in zip(np.arange(last, -1, -1), rewards[::-1]):
             returns[i] = self.gamma * previous + reward
             previous = returns[i]
-        return returns / self.reward_sacling_factor
+        return returns / self.reward_scaling_factor
 
     @tf.function
     def train(self, states, actions, target_returns):
@@ -54,7 +54,7 @@ class Agent(object):
 class TD3Agent(Agent):
     def __init__(self, environment, policy_model, critic_model,
             critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
-            reward_sacling_factor):
+            reward_scaling_factor):
         super(TD3Agent, self).__init__(environment)
         self.policy_model = get_policy_model(policy_model, self.action_space_dim)
         self.critic_model_1 = get_critic_model(critic_model)
@@ -63,7 +63,7 @@ class TD3Agent(Agent):
         self.actor_learning_rate = actor_learning_rate
         self.gamma = gamma
         self.noise_stddev = noise_stddev
-        self.reward_sacling_factor = reward_sacling_factor
+        self.reward_scaling_factor = reward_scaling_factor
         self.critic_optimizer = keras.optimizers.Adam(self.critic_learning_rate)
         self.actor_optimizer = keras.optimizers.Adam(self.actor_learning_rate)
         self._hparams = {
@@ -72,7 +72,7 @@ class TD3Agent(Agent):
             "actor_learning_rate": self.actor_learning_rate,
             "gamma": self.gamma,
             "noise_stddev": self.noise_stddev,
-            "reward_sacling_factor": self.reward_sacling_factor,
+            "reward_scaling_factor": self.reward_scaling_factor,
             "policy_model": policy_model,
             "critic_model": critic_model,
         }
