@@ -3,6 +3,7 @@ import tensorflow_probability as tfp
 from tensorflow import keras
 from network_models import get_policy_model, get_critic_model
 import numpy as np
+from ornstein_uhlenbeck import OUProcess
 
 
 class Agent(object):
@@ -175,3 +176,108 @@ class TD3Agent(Agent):
         critic_loss = self.get_critic_loss(states, actions, target_returns)
         actor_loss = self.get_actor_loss(states)
         return critic_loss, actor_loss
+
+
+class TD3AgentPartialNoise(TD3Agent):
+    def __init__(self, environment, policy_model, critic_model,
+            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
+            noise_prob, reward_scaling_factor):
+        super(TD3AgentPartialNoise, self).__init__(
+            environment, policy_model, critic_model,
+            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
+            reward_scaling_factor
+        )
+        self.noise_prob = noise_prob
+        self._hparams["noise_prob"] = self.noise_prob
+
+    @tf.function
+    def get_actions(self, states, explore=True, logits=False):
+        """Maps the states to the actions, depending on the values of
+        self.discrete_actions, explore and logits
+        if explore is set, must add noise on the action
+        if actions are discrete
+            if logit is set
+                must return log probs
+            else
+                must return action indices
+        """
+        if self.discrete_actions:
+            action_logits = self.policy_model(states)
+            if explore:
+                noise = tf.random.normal(
+                    shape=tf.shape(action_logits),
+                    stddev=self.noise_stddev
+                )
+                action_logits += noise
+            if logits:
+                return action_logits
+            actions_distribution = \
+                tfp.distributions.Categorical(logits=action_logits)
+            return actions_distribution.sample()
+        else:  # continuous action control
+            actions = self.policy_model(states)
+            if explore:
+                noise = tf.random.normal(
+                    shape=tf.shape(actions),
+                    stddev=self.noise_stddev
+                )
+                gate = tf.random.uniform(
+                    shape=tf.shape(actions)[:1],
+                    dtype=tf.float32
+                )
+                gate = tf.cast(tf.greater(self.noise_prob, gate), tf.float32)
+                actions += noise * gate
+            return actions
+
+
+class TD3AgentOrnsteinUhlenbeck(TD3Agent):
+    def __init__(self, environment, policy_model, critic_model,
+            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
+            noise_damping, reward_scaling_factor):
+        super(TD3AgentOrnsteinUhlenbeck, self).__init__(
+            environment, policy_model, critic_model,
+            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
+            reward_scaling_factor
+        )
+        self.noise_damping = noise_damping
+        self.ornstein_uhlenbeck = OUProcess(
+            tf.random.normal(
+                shape=[self.action_space_dim, 1],
+                stddev=self.noise_stddev,
+                dtype=tf.float32,
+            ),
+            damping=self.noise_damping,
+            stddev=self.noise_stddev,
+        )
+        self._hparams["noise_damping"] = self.noise_damping
+
+    @tf.function
+    def get_actions(self, states, explore=True, logits=False):
+        """Maps the states to the actions, depending on the values of
+        self.discrete_actions, explore and logits
+        if explore is set, must add noise on the action
+        if actions are discrete
+            if logit is set
+                must return log probs
+            else
+                must return action indices
+        """
+        if self.discrete_actions:
+            action_logits = self.policy_model(states)
+            if explore:
+                noise = tf.random.normal(
+                    shape=tf.shape(action_logits),
+                    stddev=self.noise_stddev
+                )
+                action_logits += noise
+            if logits:
+                return action_logits
+            actions_distribution = \
+                tfp.distributions.Categorical(logits=action_logits)
+            return actions_distribution.sample()
+        else:  # continuous action control
+            actions = self.policy_model(states)
+            if explore:
+                noise = self.ornstein_uhlenbeck()
+                actions += noise
+            return actions
