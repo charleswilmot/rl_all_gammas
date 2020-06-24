@@ -1,12 +1,12 @@
 agent:
   class: TD3Agent
-  gamma: 0.0
+  gamma: 0.95
   critic_learning_rate: 2e-3
   actor_learning_rate: 1e-4
   policy_model: type1
   critic_model: type1
-  noise_stddev: 0.1
-  reward_scaling_factor: 0.1
+  noise_stddev: 1.5
+  reward_scaling_factor: 40
 
 replay_buffer:
   class: SimpleReplayBuffer
@@ -19,7 +19,7 @@ environment:
 
 algorithm:
   class: OffPolicyAlgorithm
-  training_steps: 2000
+  training_steps: 10000
   evaluate_every: 10
   train_every: 128
   batch_size: 128
