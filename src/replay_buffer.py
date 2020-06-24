@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class ReplayBuffer(object):
+class ReplayBufferBase(object):
     def __init__(self, size):
         self.size = size
         self.current_last = 0
@@ -19,31 +19,58 @@ class ReplayBuffer(object):
         pass
 
 
-class SimpleReplayBuffer(ReplayBuffer):
+def type_mapper(value):
+    if type(value) is np.ndarray:
+        return value.dtype
+    elif type(value) is list:
+        if type(value[0]) is int:
+            return np.int32
+        elif type(value[0]) is float:
+            return np.float32
+        elif type(value[0]) is bool:
+            return np.bool
+        else:
+            raise ValueError("Unrecognized type: {}".format(type(value)))
+    else:
+        raise ValueError("Must be a list or an array ({})".format(type(value)))
+
+
+def shape_mapper(value):
+    if type(value) is np.ndarray:
+        return value.shape[1:]  # skip batch dimension
+    elif type(value) is list:
+        return ()
+    else:
+        raise ValueError("Must be a list or an array ({})".format(type(value)))
+
+
+class ReplayBuffer(ReplayBufferBase):
     def __init__(self, size):
-        super(SimpleReplayBuffer, self).__init__(size)
+        super(ReplayBuffer, self).__init__(size)
         self.dtype = None
         self.sample_index = 0
 
-    def register_episode(self, states, explorative_actions, returns, dones):
+    def _contruct_dtype(self, **data):
+        self.dtype = np.dtype([
+            (key, type_mapper(value), shape_mapper(value))
+            for key, value in data.items()
+        ])
+
+    def _construct_buffer(self):
+        self.buffer = np.zeros(self.size, dtype=self.dtype)
+
+    def register_episode(self, **data):
         if self.dtype is None: # must create buffer and dtype
-            self.dtype = np.dtype([
-                ("states", np.float32, states.shape[1:]),
-                ("actions", np.float32, explorative_actions.shape[1:]),
-                ("returns", np.float32, returns.shape[1:]),
-                ("dones", np.bool)
-            ])
-            self.buffer = np.zeros(self.size, dtype=self.dtype)
-        n = states.shape[0]
+            self._contruct_dtype(**data)
+            self._construct_buffer()
+        n = len(next(iter(data.values())))
         indices = self.get_insertion_indices(n)
         if self.current_last < self.size:
             self.current_last = self.current_last + n
         if self.current_last > self.size:
             self.current_last = self.size
-        self.buffer["states"][indices] = states
-        self.buffer["actions"][indices] = explorative_actions
-        self.buffer["returns"][indices] = returns
-        self.buffer["dones"][indices] = dones
+        for key, value in data.items():
+            self.buffer[key][indices] = value
 
     def get_insertion_indices(self, n):
         if self.current_last < self.size:
@@ -79,15 +106,12 @@ class SimpleReplayBuffer(ReplayBuffer):
 
 if __name__ == "__main__":
     def test_simple_replay_buffer():
-        replay = SimpleReplayBuffer(16)
+        replay = ReplayBuffer(16)
 
-        all_states = np.arange(100 * 3, dtype=np.float32).reshape((20, 5, 3))
-        all_actions = np.arange(100 * 2, dtype=np.float32).reshape((20, 5, 2))
-        all_returns = np.arange(100 * 1, dtype=np.float32).reshape((20, 5, ))
-        all_dones = np.zeros((20, 5), dtype=np.bool)
+        all_returns = np.arange(100, dtype=np.float32).reshape((20, 5, 1))
 
-        for states, actions, returns, dones in zip(all_states, all_actions, all_returns, all_dones):
-            replay.register_episode(states, actions, returns, dones)
+        for returns in all_returns:
+            replay.register_episode(returns=returns)
             print(replay.buffer)
             print("")
             print(replay.sample(5))

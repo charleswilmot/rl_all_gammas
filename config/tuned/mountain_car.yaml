@@ -6,11 +6,11 @@ agent:
   policy_model: type1
   critic_model: type1
   noise_stddev: 0.1
-  noise_damping: 0.05
+  noise_damping: 0.04
   reward_scaling_factor: 40
 
 replay_buffer:
-  class: SimpleReplayBuffer
+  class: ReplayBuffer
   size: 10000
 
 environment:

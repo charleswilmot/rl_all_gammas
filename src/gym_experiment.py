@@ -1,7 +1,7 @@
 from environment import get_environment
 from agents import Agent
 from algorithms import Algorithm
-from replay_buffer import ReplayBuffer
+from replay_buffer import ReplayBufferBase
 import hydra
 
 
@@ -10,7 +10,7 @@ def main(cfg):
     print(cfg.pretty(), end="\n\n\n")
     environment = get_environment(**cfg["environment"])
     agent = Agent.from_conf(environment, **cfg["agent"])
-    replay_buffer = ReplayBuffer.from_conf(**cfg["replay_buffer"])
+    replay_buffer = ReplayBufferBase.from_conf(**cfg["replay_buffer"])
     algorithm = Algorithm.from_conf(
         environment,
         agent,

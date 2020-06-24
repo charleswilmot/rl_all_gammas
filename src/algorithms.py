@@ -237,10 +237,10 @@ class OffPolicyAlgorithm(Algorithm):
         )
         self.training_critic_signal_to_noise(signal_to_noise)
         self.replay_buffer.register_episode(
-            states[:n_transitions],
-            actions[:n_transitions],
-            returns,
-            dones[:n_transitions]
+            states=states[:n_transitions],
+            actions=actions[:n_transitions],
+            returns=returns,
+            dones=dones[:n_transitions]
         )
         # must return number of iteration added to the buffer in order to ensure
         # that the correct number of weight update is performed

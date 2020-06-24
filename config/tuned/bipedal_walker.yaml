@@ -9,7 +9,7 @@ agent:
   reward_scaling_factor: 10
 
 replay_buffer:
-  class: SimpleReplayBuffer
+  class: ReplayBuffer
   size: 10000
 
 environment:
