@@ -53,6 +53,15 @@ class CriticType2(KerasMLP):
         )
 
 
+class PolicyType3(KerasMLP):
+    def __init__(self, action_space_dim):
+        super(PolicyType1, self).__init__(
+            (100, tf.nn.relu),
+            (100, tf.nn.relu),
+            (action_space_dim, tf.tanh)
+        )
+
+
 def get_critic_model(name):
     if name == "type1":
         return CriticType1()
@@ -67,5 +76,7 @@ def get_policy_model(name, action_space_dim):
         return PolicyType1(action_space_dim)
     if name == "type2":
         return PolicyType2(action_space_dim)
+    if name == "type3":
+        return PolicyType3(action_space_dim)
     else:
         raise ArgumentError("Unrecognized critic model name {}".format(name))
