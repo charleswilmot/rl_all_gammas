@@ -55,7 +55,7 @@ class CriticType2(KerasMLP):
 
 class PolicyType3(KerasMLP):
     def __init__(self, action_space_dim):
-        super(PolicyType1, self).__init__(
+        super(PolicyType3, self).__init__(
             (100, tf.nn.relu),
             (100, tf.nn.relu),
             (action_space_dim, tf.tanh)
