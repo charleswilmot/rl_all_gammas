@@ -164,13 +164,33 @@ class OffPolicyAlgorithm(Algorithm):
         # sample from buffer
         training_data = self.replay_buffer.sample(self.batch_size)
         # call agent.train
-        critic_loss, actor_loss = self.agent.train(
-            training_data["states"],
-            training_data["actions"],
-            training_data["returns"],
-            train_actor=train_actor,
-            train_critic=train_critic
-        )
+        if self.replay_buffer.is_prioritized:
+            critic_loss, actor_loss = self.agent.train(
+                training_data["states"],
+                training_data["actions"],
+                training_data["returns"],
+                train_actor=train_actor,
+                train_critic=train_critic,
+                batch_weights=training_data["importance"]
+            )
+            estimated_returns = self.agent.get_estimated_returns(
+                training_data["states"],
+                training_data["actions"],
+                mode=1
+            )
+            priorities = np.abs(estimated_returns[:, 0] - training_data["returns"])
+            self.replay_buffer.update_priorities(
+                training_data["indices"],
+                priorities
+            )
+        else:
+            critic_loss, actor_loss = self.agent.train(
+                training_data["states"],
+                training_data["actions"],
+                training_data["returns"],
+                train_actor=train_actor,
+                train_critic=train_critic
+            )
         self.train_step_counter.assign_add(1)
         # accumulate log data in keras metrics
         self.training_critic_loss(critic_loss)
@@ -187,7 +207,6 @@ class OffPolicyAlgorithm(Algorithm):
             shape = (max_steps, ) + self.env.action_space.shape
         actions = np.zeros(shape=shape, dtype=np.float32)
         rewards = np.zeros(shape=max_steps, dtype=np.float32)
-        dones = np.zeros(shape=max_steps, dtype=np.bool)
         estimated_returns = np.zeros(shape=max_steps, dtype=np.float32)
         state = self.env.reset()
         n_transitions = 0
@@ -206,7 +225,6 @@ class OffPolicyAlgorithm(Algorithm):
             states[n_transitions] = state
             actions[n_transitions] = action
             rewards[n_transitions] = reward
-            dones[n_transitions] = done
             estimated_returns[n_transitions] = estimated_return
             n_transitions += 1
             if done:
@@ -240,7 +258,7 @@ class OffPolicyAlgorithm(Algorithm):
             states=states[:n_transitions],
             actions=actions[:n_transitions],
             returns=returns,
-            dones=dones[:n_transitions]
+            priorities=np.abs(noise)
         )
         # must return number of iteration added to the buffer in order to ensure
         # that the correct number of weight update is performed

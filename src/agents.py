@@ -142,39 +142,58 @@ class TD3Agent(Agent):
             raise ArgumentError("Unrecognized return estimate mode")
 
     @tf.function
-    def get_critic_loss(self, states, actions, target_returns):
-        h = keras.losses.Huber(delta=1.0)
+    def get_critic_loss(self, states, actions, target_returns,
+            batch_weights=None):
         target_returns = tf.reshape(target_returns, (-1, 1))
         estimated_returns_1 = self.get_estimated_returns(states, actions, mode=1)
         estimated_returns_2 = self.get_estimated_returns(states, actions, mode=2)
+        h = keras.losses.Huber(delta=1.0, reduction='none')
         loss = h(target_returns, estimated_returns_1)
         loss += h(target_returns, estimated_returns_2)
-        return loss / 2
+        if batch_weights is not None:
+            loss *= batch_weights
+        return tf.reduce_mean(loss) / 2
 
     @tf.function
-    def get_actor_loss(self, states):
+    def get_actor_loss(self, states, batch_weights=None):
         actions = self.get_actions(states, explore=False, logits=True)
-        return - tf.reduce_mean(
-            self.get_estimated_returns(states, actions, mode=1)
-        )
+        if batch_weights is not None:
+            return - tf.reduce_mean(
+                self.get_estimated_returns(states, actions, mode=1)[:, 0] \
+                * batch_weights
+            )
+        else:
+            return - tf.reduce_mean(
+                self.get_estimated_returns(states, actions, mode=1)[:, 0]
+            )
 
     @tf.function
     def train(self, states, actions, target_returns, train_actor=True,
-            train_critic=True):
+            train_critic=True, batch_weights=None):
         if train_actor:
             train_op_actor = self.actor_optimizer.minimize(
-                lambda: self.get_actor_loss(states),
+                lambda: \
+                    self.get_actor_loss(states, batch_weights=batch_weights),
                 var_list=lambda: self.policy_model.variables
             )
         if train_critic:
             train_op_critic = self.critic_optimizer.minimize(
-                lambda: self.get_critic_loss(states, actions, target_returns),
+                lambda: \
+                    self.get_critic_loss(
+                        states, actions, target_returns,
+                        batch_weights=batch_weights
+                    ),
                 var_list=lambda: \
                     self.critic_model_1.variables + \
                     self.critic_model_2.variables
             )
-        critic_loss = self.get_critic_loss(states, actions, target_returns)
-        actor_loss = self.get_actor_loss(states)
+        critic_loss = self.get_critic_loss(
+            states,
+            actions,
+            target_returns,
+            batch_weights=batch_weights
+        )
+        actor_loss = self.get_actor_loss(states, batch_weights=batch_weights)
         return critic_loss, actor_loss
 
 

@@ -5,18 +5,12 @@ class ReplayBufferBase(object):
     def __init__(self, size):
         self.size = size
         self.current_last = 0
+        self.is_prioritized = False
 
     @staticmethod
     def from_conf(**replay_buffer_conf):
         class_in_conf = eval(replay_buffer_conf.pop("class"))
         return class_in_conf(**replay_buffer_conf)
-
-    def register_episode(self, states, explorative_actions, rewards, dones):
-        pass
-
-    def sample(self, batch_size):
-        # return in the format that Agent.train accepts
-        pass
 
 
 def type_mapper(value):
@@ -102,6 +96,58 @@ class ReplayBuffer(ReplayBufferBase):
             part2 = self.buffer[:batch_last - self.current_last]
             self.sample_index = batch_last - self.current_last
             return np.concatenate((part1, part2))
+
+
+class PrioritizedReplayBuffer(ReplayBuffer):
+    def __init__(self, size, alpha, beta):
+        super(PrioritizedReplayBuffer, self).__init__(size)
+        self.alpha = alpha  # 0.6
+        self.beta = beta    # 0.4
+        self.is_prioritized = True
+
+    def _contruct_dtype(self, **data):
+        self.dtype = np.dtype([
+            (key, type_mapper(value), shape_mapper(value))
+            for key, value in data.items()
+        ] + [
+            ("indices", np.int32),
+            ("importance", np.float32),
+            ("probabilities", np.float32)
+        ])
+
+    def _construct_buffer(self):
+        self.buffer = np.zeros(self.size, dtype=self.dtype)
+        self.buffer["indices"] = np.arange(self.size)
+        self.buffer["importance"] = 1
+
+    def register_episode(self, priorities, **data):
+        # enforce a field 'priorities'
+        super(PrioritizedReplayBuffer, self).register_episode(
+            priorities=priorities,
+            **data
+        )
+
+    def sample(self, batch_size):
+        if self.current_last < batch_size or batch_size > self.size:
+            return self.buffer[:self.current_last]
+        # prob = p_k^alpha / sum_k p_k^alpha
+        self.buffer["probabilities"][:self.current_last] = \
+                    self.buffer["priorities"][:self.current_last] ** self.alpha
+        self.buffer["probabilities"][:self.current_last] /= \
+                    np.sum(self.buffer["probabilities"][:self.current_last])
+        indices = np.random.choice(
+            self.current_last,
+            batch_size,
+            replace=False,
+            p=self.buffer["probabilities"][:self.current_last]
+        )
+        # importance = (batch_size * prob_k) ** -beta
+        self.buffer["importance"][indices] = \
+            (batch_size * self.buffer["probabilities"][indices]) ** -self.beta
+        return self.buffer[indices]
+
+    def update_priorities(self, indices, priorities):
+        self.buffer["priorities"][indices] = priorities
 
 
 if __name__ == "__main__":
