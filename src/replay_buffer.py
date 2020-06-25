@@ -6,6 +6,10 @@ class ReplayBufferBase(object):
         self.size = size
         self.current_last = 0
         self.is_prioritized = False
+        self._hparams = {
+            "buffer_size": self.size,
+            "buffer_class": "ReplayBufferBase"
+        }
 
     @staticmethod
     def from_conf(**replay_buffer_conf):
@@ -43,6 +47,7 @@ class ReplayBuffer(ReplayBufferBase):
         super(ReplayBuffer, self).__init__(size)
         self.dtype = None
         self.sample_index = 0
+        self._hparams["buffer_class"] = "ReplayBuffer"
 
     def _contruct_dtype(self, **data):
         self.dtype = np.dtype([
@@ -104,6 +109,9 @@ class PrioritizedReplayBuffer(ReplayBuffer):
         self.alpha = alpha  # 0.6
         self.beta = beta    # 0.4
         self.is_prioritized = True
+        self._hparams["buffer_class"] = "PrioritizedReplayBuffer"
+        self._hparams["buffer_alpha"] = self.alpha
+        self._hparams["buffer_beta"] = self.beta
 
     def _contruct_dtype(self, **data):
         self.dtype = np.dtype([

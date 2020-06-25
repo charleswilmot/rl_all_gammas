@@ -152,7 +152,11 @@ class OffPolicyAlgorithm(Algorithm):
                 self.testing_mean_total_episode_reward.result(),
                 step=step
             )
-            hparams = {**self.agent._hparams, **self._hparams}
+            hparams = {
+                **self.agent._hparams,
+                **self.replay_buffer._hparams,
+                **self._hparams,
+            }
             hp.hparams(hparams)
         self.training_episode_length.reset_states()
         self.training_critic_loss.reset_states()
