@@ -156,6 +156,7 @@ class OffPolicyAlgorithm(Algorithm):
                 **self.agent._hparams,
                 **self.replay_buffer._hparams,
                 **self._hparams,
+                "env_id": self.env.spec.id,
             }
             hp.hparams(hparams)
         self.training_episode_length.reset_states()
