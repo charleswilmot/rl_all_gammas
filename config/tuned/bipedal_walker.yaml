@@ -1,11 +1,12 @@
 agent:
-  class: TD3Agent
+  class: TD3AgentOrnsteinUhlenbeck
   gamma: 0.995
   critic_learning_rate: 2e-3
   actor_learning_rate: 1e-4
-  policy_model: type1
+  policy_model: type3
   critic_model: type1
-  noise_stddev: 0.2
+  noise_stddev: 0.1
+  noise_damping: 0.1
   reward_scaling_factor: 10
 
 replay_buffer:
