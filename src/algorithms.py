@@ -58,7 +58,8 @@ class OffPolicyAlgorithm(Algorithm):
         self.return_viewer = ReturnViewer() if return_viewer else False
         self.episode_counter = tf.Variable(0, name="episode_counter")
         self.train_step_counter = tf.Variable(0, name="train_step")
-        self.global_step = self.train_step_counter
+        # self.global_step = self.train_step_counter
+        self.global_step = self.episode_counter
         self._hparams = {
             "train_every": self.train_every,
             "batch_size": self.batch_size
