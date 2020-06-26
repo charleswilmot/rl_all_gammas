@@ -226,12 +226,13 @@ class Agent(AgentBase):
             targets = np.zeros(shape=(len(rewards),) + rshape, dtype=np.float32)
             # strict part
             strict_size = len(rewards) - n_steps + 1
-            targets[:strict_size - 1] = estimated_returns[n_steps:]
-            targets[strict_size - 1] = bootstraping_return
-            targets[:strict_size] *= self.gamma ** n_steps
-            for i in range(n_steps):
-                tmp = self.gamma ** i * rewards[i:i + strict_size]
-                targets[:strict_size] += tmp
+            if strict_size > 0:
+                targets[:strict_size - 1] = estimated_returns[n_steps:]
+                targets[strict_size - 1] = bootstraping_return
+                targets[:strict_size] *= self.gamma ** n_steps
+                for i in range(n_steps):
+                    tmp = self.gamma ** i * rewards[i:i + strict_size]
+                    targets[:strict_size] += tmp
             # adaptive n_steps part (plays an important role)
             previous = bootstraping_return
             rewards_rest = rewards[1 - n_steps:]
