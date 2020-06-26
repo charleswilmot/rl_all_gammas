@@ -212,13 +212,16 @@ class Agent(AgentBase):
         if self.target_computation_params["type"] == "n_steps_strict":
             n_steps = self.target_computation_params["n_steps"]
             final_size = len(rewards) - n_steps + 1
-            rshape = rewards.shape[1:]
-            targets = np.zeros(shape=(final_size,) + rshape, dtype=np.float32)
-            targets[:-1] = estimated_returns[n_steps:]
-            targets[-1] = bootstraping_return
-            targets *= self.gamma ** n_steps
-            for i in range(n_steps):
-                targets += self.gamma ** i * rewards[i:i + final_size]
+            if final_size > 0:
+                rshape = rewards.shape[1:]
+                targets = np.zeros(shape=(final_size,) + rshape, dtype=np.float32)
+                targets[:-1] = estimated_returns[n_steps:]
+                targets[-1] = bootstraping_return
+                targets *= self.gamma ** n_steps
+                for i in range(n_steps):
+                    targets += self.gamma ** i * rewards[i:i + final_size]
+            else:
+                targets = np.zeros(shape=(0,) + rshape, dtype=np.float32)
             return targets
         elif self.target_computation_params["type"] == "n_steps":
             n_steps = self.target_computation_params["n_steps"]
@@ -233,10 +236,14 @@ class Agent(AgentBase):
                 for i in range(n_steps):
                     tmp = self.gamma ** i * rewards[i:i + strict_size]
                     targets[:strict_size] += tmp
+                rewards_rest = rewards[1 - n_steps:]
+            else:
+                strict_size = 0
+                rewards_rest = rewards
             # adaptive n_steps part (plays an important role)
+            last = len(rewards_rest) - 1
             previous = bootstraping_return
-            rewards_rest = rewards[1 - n_steps:]
-            last = n_steps - 2
+            rewards_rest = rewards[remainder_reward_index:]
             for i, reward in zip(np.arange(last, -1, -1), rewards_rest[::-1]):
                 targets[i + strict_size] = self.gamma * previous + reward
                 previous = targets[i + strict_size]
