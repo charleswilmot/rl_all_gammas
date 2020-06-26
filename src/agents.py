@@ -243,7 +243,6 @@ class Agent(AgentBase):
             # adaptive n_steps part (plays an important role)
             last = len(rewards_rest) - 1
             previous = bootstraping_return
-            rewards_rest = rewards[remainder_reward_index:]
             for i, reward in zip(np.arange(last, -1, -1), rewards_rest[::-1]):
                 targets[i + strict_size] = self.gamma * previous + reward
                 previous = targets[i + strict_size]
