@@ -1,8 +1,9 @@
 import gym
 from gym import wrappers
+import os
 
 
-def get_environment(env_id, seed, monitor, outdir="./"):
+def get_environment(env_id, seed, monitor, outdir=None):
     env = gym.make(env_id)
     if monitor:
         if monitor == "always":
@@ -13,6 +14,8 @@ def get_environment(env_id, seed, monitor, outdir="./"):
             raise ArgumentError(
                 "Monitor parameter not recognized ({})".foremat(monitor)
             )
+        if outdir is None:
+            outdir = os.getcwd()
         env = wrappers.Monitor(
             env,
             directory=outdir,

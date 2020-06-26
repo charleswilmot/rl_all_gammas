@@ -12,7 +12,7 @@ PASSWORD = None
 REMOTE_HOST_NAME = 'otto'
 
 
-@hydra.main(config_path='../config/config.yaml', strict=False)
+@hydra.main(config_path='../config/config.yaml', strict=True)
 def send_job(cfg):
         command_line_args = serialize_cfg(cfg)
         command_line_args += additional_args()

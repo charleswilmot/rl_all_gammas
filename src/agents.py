@@ -195,16 +195,36 @@ class Agent(AgentBase):
             bootstraping_return):
         # estimated_returns and bootstraping_return are scaled down
         # rewards are the raw rewards from the environment
-        if self.target_computation_params["type"] == "n_steps":
+        if self.target_computation_params["type"] == "n_steps_strict":
             n_steps = self.target_computation_params["n_steps"]
             final_size = len(rewards) - n_steps + 1
             rshape = rewards.shape[1:]
             targets = np.zeros(shape=(final_size,) + rshape, dtype=np.float32)
-            targets[:-1] = estimated_returns[n_steps + 1:]
+            targets[:-1] = estimated_returns[n_steps:]
             targets[-1] = bootstraping_return
             targets *= self.gamma ** n_steps
             for i in range(n_steps):
                 targets += self.gamma ** i * rewards[i:i + final_size]
+            return targets
+        elif self.target_computation_params["type"] == "n_steps":
+            n_steps = self.target_computation_params["n_steps"]
+            rshape = rewards.shape[1:]
+            targets = np.zeros(shape=(len(rewards),) + rshape, dtype=np.float32)
+            # strict part
+            strict_size = len(rewards) - n_steps + 1
+            targets[:strict_size - 1] = estimated_returns[n_steps:]
+            targets[strict_size - 1] = bootstraping_return
+            targets[:strict_size] *= self.gamma ** n_steps
+            for i in range(n_steps):
+                tmp = self.gamma ** i * rewards[i:i + strict_size]
+                targets[:strict_size] += tmp
+            # adaptive n_steps part (plays an important role)
+            previous = bootstraping_return
+            rewards_rest = rewards[1 - n_steps:]
+            last = n_steps - 2
+            for i, reward in zip(np.arange(last, -1, -1), rewards_rest[::-1]):
+                targets[i + strict_size] = self.gamma * previous + reward
+                previous = targets[i + strict_size]
             return targets
         elif self.target_computation_params["type"] == "max_steps":
             returns = np.zeros_like(rewards)
@@ -229,9 +249,10 @@ class Agent(AgentBase):
             estimated_returns,
             bootstraping_return
         )
+        n = len(targets)
         ret = {}
-        ret["states"] = states
-        ret["actions"] = actions
+        ret["states"] = states[:n]
+        ret["actions"] = actions[:n]
         ret["targets"] = targets
-        ret["priorities"] = np.abs(targets - estimated_returns)
+        ret["priorities"] = np.abs(targets - estimated_returns[:n])
         return ret

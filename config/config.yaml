@@ -11,6 +11,7 @@ agent:
     stddev: 0.1
   target_computation_params:
     type: max_steps
+    n_steps: None
 
 replay_buffer:
   class: PrioritizedReplayBuffer
@@ -35,7 +36,7 @@ algorithm:
 
 hydra:
   run:
-    dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}_${environment.env_id}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}
+    dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}_${environment.env_id}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_params.stddev}
   sweep:
     dir: ../experiments/${now:%Y-%m-%d}/${now:%H-%M-%S}/
-    subdir: job${hydra.job.num}_${environment.env_id}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_stddev}
+    subdir: job${hydra.job.num}_${environment.env_id}_clr${agent.critic_learning_rate}_alr${agent.actor_learning_rate}_g${agent.gamma}_n${agent.noise_params.stddev}

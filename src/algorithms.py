@@ -260,7 +260,7 @@ class OffPolicyAlgorithm(Algorithm):
         if self.return_viewer:
             self.return_viewer(targets, estimated_returns[:n_transitions])
         # log signal to noise ratio
-        noise = targets - estimated_returns[:n_transitions]
+        noise = targets - estimated_returns[:len(targets)]
         signal_to_noise = 10 * (
             np.log10(np.var(targets)) - np.log10(np.var(noise))
         )
