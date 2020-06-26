@@ -130,6 +130,11 @@ class Agent(AgentBase):
             raise ArgumentError("Unrecognized return estimate mode")
 
     @tf.function
+    def get_bootstraping_return(self, states):
+        actions = self.get_actions(states, explore=False)
+        return self.get_estimated_returns(states, actions)
+
+    @tf.function
     def get_critic_loss(self, states, actions, target_returns,
             batch_weights=None):
         target_returns = tf.reshape(target_returns, (-1, 1))
@@ -156,25 +161,29 @@ class Agent(AgentBase):
             )
 
     @tf.function
+    def train_actor(self, states, batch_weights=None):
+        train_op_actor = self.actor_optimizer.minimize(
+            lambda: \
+                self.get_actor_loss(states, batch_weights=batch_weights),
+            var_list=lambda: self.policy_model.variables
+        )
+
+    @tf.function
+    def train_critic(self, states, actions, target_returns, batch_weights=None):
+        train_op_critic = self.critic_optimizer.minimize(
+            lambda: \
+                self.get_critic_loss(
+                    states, actions, target_returns,
+                    batch_weights=batch_weights
+                ),
+            var_list=lambda: \
+                self.critic_model_1.variables + \
+                self.critic_model_2.variables
+        )
+
+    @tf.function
     def train(self, states, actions, target_returns, train_actor=True,
             train_critic=True, batch_weights=None):
-        if train_actor:
-            train_op_actor = self.actor_optimizer.minimize(
-                lambda: \
-                    self.get_actor_loss(states, batch_weights=batch_weights),
-                var_list=lambda: self.policy_model.variables
-            )
-        if train_critic:
-            train_op_critic = self.critic_optimizer.minimize(
-                lambda: \
-                    self.get_critic_loss(
-                        states, actions, target_returns,
-                        batch_weights=batch_weights
-                    ),
-                var_list=lambda: \
-                    self.critic_model_1.variables + \
-                    self.critic_model_2.variables
-            )
         critic_loss = self.get_critic_loss(
             states,
             actions,
@@ -182,6 +191,11 @@ class Agent(AgentBase):
             batch_weights=batch_weights
         )
         actor_loss = self.get_actor_loss(states, batch_weights=batch_weights)
+        if train_actor:
+            self.train_actor(states, batch_weights=batch_weights)
+        if train_critic:
+            self.train_critic(states, actions, target_returns,
+                batch_weights=batch_weights)
         return critic_loss, actor_loss
 
     def rewards_to_target_returns(self, rewards, *args, **kwargs):
