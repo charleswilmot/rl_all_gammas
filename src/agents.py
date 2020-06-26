@@ -6,77 +6,52 @@ import numpy as np
 from ornstein_uhlenbeck import OUProcess
 
 
-class Agent(object):
-    def __init__(self, environment):
+class AgentBase(object):
+    @staticmethod
+    def from_conf(environment, **agent_conf):
+        class_in_conf = eval(agent_conf.pop("class"))
+        return class_in_conf(environment, **agent_conf)
+
+
+class Agent(AgentBase):
+    def __init__(self, environment, policy_model, critic_model,
+            critic_learning_rate, actor_learning_rate, gamma, noise_params,
+            reward_scaling_factor, target_computation_params):
         self.discrete_actions = environment.action_space.dtype == np.int64
         if self.discrete_actions:
             self.action_space_dim = environment.action_space.n
         else:
             self.action_space_dim = environment.action_space.shape[0]
         self.state_space_shape = environment.observation_space.shape
-
-    @staticmethod
-    def from_conf(environment, **agent_conf):
-        class_in_conf = eval(agent_conf.pop("class"))
-        return class_in_conf(environment, **agent_conf)
-
-    @tf.function
-    def get_actions(self, states, explore=True):
-        pass
-
-    @tf.function
-    def get_estimated_returns(self, states, actions):
-        pass
-
-    @tf.function
-    def get_critic_loss(self, states, actions, target_returns):
-        pass
-
-    @tf.function
-    def get_actor_loss(self, states):
-        pass
-
-    def rewards_to_target_returns(self, rewards, bootstraping_return):
-        returns = np.zeros_like(rewards)
-        # to reward scale
-        previous = bootstraping_return * self.reward_scaling_factor
-        last = rewards.shape[0] - 1
-        for i, reward in zip(np.arange(last, -1, -1), rewards[::-1]):
-            returns[i] = self.gamma * previous + reward
-            previous = returns[i]
-        return returns / self.reward_scaling_factor
-
-    @tf.function
-    def train(self, states, actions, target_returns):
-        # something with gradient tape
-        pass
-
-
-class TD3Agent(Agent):
-    def __init__(self, environment, policy_model, critic_model,
-            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
-            reward_scaling_factor):
-        super(TD3Agent, self).__init__(environment)
         self.policy_model = get_policy_model(policy_model, self.action_space_dim)
         self.critic_model_1 = get_critic_model(critic_model)
         self.critic_model_2 = get_critic_model(critic_model)
         self.critic_learning_rate = critic_learning_rate
         self.actor_learning_rate = actor_learning_rate
         self.gamma = gamma
-        self.noise_stddev = noise_stddev
+        self.noise_params = noise_params
         self.reward_scaling_factor = reward_scaling_factor
+        self.target_computation_params = target_computation_params
         self.critic_optimizer = keras.optimizers.Adam(self.critic_learning_rate)
         self.actor_optimizer = keras.optimizers.Adam(self.actor_learning_rate)
         self._hparams = {
-            # hp.HParam('actor_learning_rate', hp.RealInterval(1e-6, 1e-2))
             "critic_learning_rate": self.critic_learning_rate,
             "actor_learning_rate": self.actor_learning_rate,
             "gamma": self.gamma,
-            "noise_stddev": self.noise_stddev,
             "reward_scaling_factor": self.reward_scaling_factor,
             "policy_model": policy_model,
             "critic_model": critic_model,
         }
+        self._noise_params_to_hparams()
+        self._target_computation_params_to_hparams()
+
+    def _noise_params_to_hparams(self):
+        for key, value in self.noise_params.items():
+            self._hparams["noise_" + key] = value
+
+    def _target_computation_params_to_hparams(self):
+        for key, value in self.target_computation_params.items():
+            self._hparams["target_" + key] = value
 
     def save_model(self, path):
         self.critic_model_1.save_weights(path + "/critic_model_1")
@@ -89,9 +64,37 @@ class TD3Agent(Agent):
         self.policy_model.load_weights(path + "/policy_model")
 
     @tf.function
-    def get_actions(self, states, explore=True, logits=False):
+    def get_noise(self, shape):
+        stddev = self.noise_params["stddev"]
+        if self.noise_params["type"] == "normal":
+            return tf.random.normal(shape=shape, stddev=stddev)
+        elif self.noise_params["type"] == "partial":
+            noise_prob = self.noise_params["prob"]
+            noise = tf.random.normal(shape=shape, stddev=stddev)
+            gate = tf.random.uniform(shape=shape[:1], dtype=tf.float32)
+            gate = tf.cast(tf.greater(noise_prob, gate), tf.float32)
+            return noise * gate
+        elif self.noise_params["type"] == "ornstein_uhlenbeck":
+            if not hasattr(self, "ornstein_uhlenbeck"):
+                self.ornstein_uhlenbeck = OUProcess(
+                    tf.random.normal(
+                        shape=[self.action_space_dim, 1],
+                        stddev=stddev,
+                        dtype=tf.float32,
+                    ),
+                    damping=self.noise_params["ou_damping"],
+                    stddev=stddev,
+                )
+            return self.ornstein_uhlenbeck()
+        else:
+            raise ValueError("Unrecognized noise type, got {}".format(
+                self.noise_params["type"]
+            ))
+
+    @tf.function
+    def get_actions(self, states, explore=True):
         """Maps the states to the actions, depending on the values of
-        self.discrete_actions, explore and logits
+        self.discrete_actions and explore
         if explore is set, must add noise on the action
         if actions are discrete
             if logit is set
@@ -100,26 +103,11 @@ class TD3Agent(Agent):
                 must return action indices
         """
         if self.discrete_actions:
-            action_logits = self.policy_model(states)
-            if explore:
-                noise = tf.random.normal(
-                    shape=tf.shape(action_logits),
-                    stddev=self.noise_stddev
-                )
-                action_logits += noise
-            if logits:
-                return action_logits
-            actions_distribution = \
-                tfp.distributions.Categorical(logits=action_logits)
-            return actions_distribution.sample()
-        else:  # continuous action control
+            raise NotImplementedError("Discrete actions are not handeled")
+        else:
             actions = self.policy_model(states)
             if explore:
-                noise = tf.random.normal(
-                    shape=tf.shape(actions),
-                    stddev=self.noise_stddev
-                )
-                actions += noise
+                actions += self.get_noise(tf.shape(actions))
             return actions
 
     @tf.function
@@ -156,7 +144,7 @@ class TD3Agent(Agent):
 
     @tf.function
     def get_actor_loss(self, states, batch_weights=None):
-        actions = self.get_actions(states, explore=False, logits=True)
+        actions = self.get_actions(states, explore=False)
         if batch_weights is not None:
             return - tf.reduce_mean(
                 self.get_estimated_returns(states, actions, mode=1)[:, 0] \
@@ -196,107 +184,54 @@ class TD3Agent(Agent):
         actor_loss = self.get_actor_loss(states, batch_weights=batch_weights)
         return critic_loss, actor_loss
 
-
-class TD3AgentPartialNoise(TD3Agent):
-    def __init__(self, environment, policy_model, critic_model,
-            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
-            noise_prob, reward_scaling_factor):
-        super(TD3AgentPartialNoise, self).__init__(
-            environment, policy_model, critic_model,
-            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
-            reward_scaling_factor
+    def rewards_to_target_returns(self, rewards, *args, **kwargs):
+        return self.scaled_rewards_to_target_returns(
+            rewards / self.reward_scaling_factor,
+            *args,
+            **kwargs
         )
-        self.noise_prob = noise_prob
-        self._hparams["noise_prob"] = self.noise_prob
 
-    @tf.function
-    def get_actions(self, states, explore=True, logits=False):
-        """Maps the states to the actions, depending on the values of
-        self.discrete_actions, explore and logits
-        if explore is set, must add noise on the action
-        if actions are discrete
-            if logit is set
-                must return log probs
-            else
-                must return action indices
-        """
-        if self.discrete_actions:
-            action_logits = self.policy_model(states)
-            if explore:
-                noise = tf.random.normal(
-                    shape=tf.shape(action_logits),
-                    stddev=self.noise_stddev
-                )
-                action_logits += noise
-            if logits:
-                return action_logits
-            actions_distribution = \
-                tfp.distributions.Categorical(logits=action_logits)
-            return actions_distribution.sample()
-        else:  # continuous action control
-            actions = self.policy_model(states)
-            if explore:
-                noise = tf.random.normal(
-                    shape=tf.shape(actions),
-                    stddev=self.noise_stddev
-                )
-                gate = tf.random.uniform(
-                    shape=tf.shape(actions)[:1],
-                    dtype=tf.float32
-                )
-                gate = tf.cast(tf.greater(self.noise_prob, gate), tf.float32)
-                actions += noise * gate
-            return actions
+    def scaled_rewards_to_target_returns(self, rewards, estimated_returns,
+            bootstraping_return):
+        # estimated_returns and bootstraping_return are scaled down
+        # rewards are the raw rewards from the environment
+        if self.target_computation_params["type"] == "n_steps":
+            n_steps = self.target_computation_params["n_steps"]
+            final_size = len(rewards) - n_steps + 1
+            rshape = rewards.shape[1:]
+            targets = np.zeros(shape=(final_size,) + rshape, dtype=np.float32)
+            targets[:-1] = estimated_returns[n_steps + 1:]
+            targets[-1] = bootstraping_return
+            targets *= self.gamma ** n_steps
+            for i in range(n_steps):
+                targets += self.gamma ** i * rewards[i:i + final_size]
+            return targets
+        elif self.target_computation_params["type"] == "max_steps":
+            returns = np.zeros_like(rewards)
+            previous = bootstraping_return
+            last = rewards.shape[0] - 1
+            for i, reward in zip(np.arange(last, -1, -1), rewards[::-1]):
+                returns[i] = self.gamma * previous + reward
+                previous = returns[i]
+            return returns
+        else:
+            raise ValueError(
+                "Unrecognized target computation type, got {}".format(
+                    self.target_computation_params["type"])
+            )
 
-
-class TD3AgentOrnsteinUhlenbeck(TD3Agent):
-    def __init__(self, environment, policy_model, critic_model,
-            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
-            noise_damping, reward_scaling_factor):
-        super(TD3AgentOrnsteinUhlenbeck, self).__init__(
-            environment, policy_model, critic_model,
-            critic_learning_rate, actor_learning_rate, gamma, noise_stddev,
-            reward_scaling_factor
+    def get_buffer_data(self, states, actions, rewards,
+            estimated_returns, bootstraping_return):
+        # must return a dict
+        # some keys are mandatory: states, actions, targets, priorities
+        targets = self.rewards_to_target_returns(
+            rewards,
+            estimated_returns,
+            bootstraping_return
         )
-        self.noise_damping = noise_damping
-        self.ornstein_uhlenbeck = OUProcess(
-            tf.random.normal(
-                shape=[self.action_space_dim, 1],
-                stddev=self.noise_stddev,
-                dtype=tf.float32,
-            ),
-            damping=self.noise_damping,
-            stddev=self.noise_stddev,
-        )
-        self._hparams["noise_damping"] = self.noise_damping
-
-    @tf.function
-    def get_actions(self, states, explore=True, logits=False):
-        """Maps the states to the actions, depending on the values of
-        self.discrete_actions, explore and logits
-        if explore is set, must add noise on the action
-        if actions are discrete
-            if logit is set
-                must return log probs
-            else
-                must return action indices
-        """
-        if self.discrete_actions:
-            action_logits = self.policy_model(states)
-            if explore:
-                noise = tf.random.normal(
-                    shape=tf.shape(action_logits),
-                    stddev=self.noise_stddev
-                )
-                action_logits += noise
-            if logits:
-                return action_logits
-            actions_distribution = \
-                tfp.distributions.Categorical(logits=action_logits)
-            return actions_distribution.sample()
-        else:  # continuous action control
-            actions = self.policy_model(states)
-            if explore:
-                noise = self.ornstein_uhlenbeck()
-                actions += noise
-            return actions
+        ret = {}
+        ret["states"] = states
+        ret["actions"] = actions
+        ret["targets"] = targets
+        ret["priorities"] = np.abs(targets - estimated_returns)
+        return ret

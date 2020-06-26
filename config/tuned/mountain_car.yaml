@@ -1,29 +1,17 @@
 agent:
-  class: TD3AgentOrnsteinUhlenbeck
-  gamma: 0.95
-  critic_learning_rate: 2e-3
-  actor_learning_rate: 1e-4
-  policy_model: type1
-  critic_model: type1
-  noise_stddev: 0.1
-  noise_damping: 0.04
   reward_scaling_factor: 40
+  noise_params:
+    type: ornstein_uhlenbeck
+    stddev: 0.1
+    ou_damping: 0.04
+  gamma: 0.95
 
-replay_buffer:
-  class: ReplayBuffer
-  size: 10000
+
+
+
 
 environment:
   env_id: MountainCarContinuous-v0
-  seed: 0
-  monitor: False
 
 algorithm:
-  class: OffPolicyAlgorithm
   training_steps: 2000
-  evaluate_every: 10
-  train_every: 128
-  batch_size: 128
-  make_critic_checkpoint: False
-  restore_from_checkpoint: False
-  return_viewer: False

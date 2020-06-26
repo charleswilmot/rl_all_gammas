@@ -1,16 +1,22 @@
 agent:
-  class: TD3Agent
+  class: Agent
   gamma: 0.995
   critic_learning_rate: 2e-3
   actor_learning_rate: 1e-4
   policy_model: type1
   critic_model: type1
-  noise_stddev: 0.1
   reward_scaling_factor: 100
+  noise_params:
+    type: normal
+    stddev: 0.1
+  target_computation_params:
+    type: max_steps
 
 replay_buffer:
-  class: ReplayBuffer
+  class: PrioritizedReplayBuffer
   size: 10000
+  alpha: 0.2
+  beta: 0.8
 
 environment:
   env_id: LunarLanderContinuous-v2

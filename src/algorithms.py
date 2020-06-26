@@ -174,7 +174,7 @@ class OffPolicyAlgorithm(Algorithm):
             critic_loss, actor_loss = self.agent.train(
                 training_data["states"],
                 training_data["actions"],
-                training_data["returns"],
+                training_data["targets"],
                 train_actor=train_actor,
                 train_critic=train_critic,
                 batch_weights=training_data["importance"]
@@ -184,7 +184,7 @@ class OffPolicyAlgorithm(Algorithm):
                 training_data["actions"],
                 mode=1
             )
-            priorities = np.abs(estimated_returns[:, 0] - training_data["returns"])
+            priorities = np.abs(estimated_returns[:, 0] - training_data["targets"])
             self.replay_buffer.update_priorities(
                 training_data["indices"],
                 priorities
@@ -193,7 +193,7 @@ class OffPolicyAlgorithm(Algorithm):
             critic_loss, actor_loss = self.agent.train(
                 training_data["states"],
                 training_data["actions"],
-                training_data["returns"],
+                training_data["targets"],
                 train_actor=train_actor,
                 train_critic=train_critic
             )
@@ -219,7 +219,6 @@ class OffPolicyAlgorithm(Algorithm):
         while True:
             action = self.agent.get_actions(
                 state[np.newaxis].astype(np.float32),
-                logits=True
             )[0]
             estimated_return = self.agent.get_estimated_returns(
                 state[np.newaxis].astype(np.float32),
@@ -237,35 +236,36 @@ class OffPolicyAlgorithm(Algorithm):
                 break
         self.training_episode_length(n_transitions)
         self.episode_counter.assign_add(1)
-        if done and n_transitions < max_steps:
+        if done:  # and n_transitions < max_steps:
             bootstraping_return = 0
         else:
             action = self.agent.get_actions(
                 state[np.newaxis].astype(np.float32),
-                logits=True,
                 explore=False
             )
             bootstraping_return = self.agent.get_estimated_returns(
                 state[np.newaxis].astype(np.float32),
                 action
             ).numpy()[0]
-        returns = self.agent.rewards_to_target_returns(
-            rewards[:n_transitions],
-            bootstraping_return
-        )
-        if self.return_viewer:
-            self.return_viewer(returns, estimated_returns[:n_transitions])
-        noise = returns - estimated_returns[:n_transitions]
-        signal_to_noise = 10 * (
-            np.log10(np.var(returns)) - np.log10(np.var(noise))
-        )
-        self.training_critic_signal_to_noise(signal_to_noise)
-        self.replay_buffer.register_episode(
+        to_buffer = self.agent.get_buffer_data(
             states=states[:n_transitions],
             actions=actions[:n_transitions],
-            returns=returns,
-            priorities=np.abs(noise)
+            rewards=rewards[:n_transitions],
+            estimated_returns=estimated_returns[:n_transitions],
+            bootstraping_return=bootstraping_return
         )
+        self.replay_buffer.register_episode(**to_buffer)
+        # display return if needed
+        targets = to_buffer["targets"]
+        if self.return_viewer:
+            self.return_viewer(targets, estimated_returns[:n_transitions])
+        # log signal to noise ratio
+        noise = targets - estimated_returns[:n_transitions]
+        signal_to_noise = 10 * (
+            np.log10(np.var(targets)) - np.log10(np.var(noise))
+        )
+        self.training_critic_signal_to_noise(signal_to_noise)
+        ########################################################################
         # must return number of iteration added to the buffer in order to ensure
         # that the correct number of weight update is performed
         return n_transitions
@@ -278,7 +278,6 @@ class OffPolicyAlgorithm(Algorithm):
             action = self.agent.get_actions(
                 state[np.newaxis].astype(np.float32),
                 explore=False,
-                logits=True
             )[0]
             state, reward, done, _ = self.env.step(action.numpy())
             n_transitions += 1

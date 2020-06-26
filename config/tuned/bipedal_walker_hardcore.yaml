@@ -1,5 +1,5 @@
 agent:
-  class: TD3Agent
+  class: MaxStepsSimpleAgent
   gamma: 0.995
   critic_learning_rate: 2e-3
   actor_learning_rate: 1e-4
