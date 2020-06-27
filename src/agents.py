@@ -96,11 +96,6 @@ class Agent(AgentBase):
         """Maps the states to the actions, depending on the values of
         self.discrete_actions and explore
         if explore is set, must add noise on the action
-        if actions are discrete
-            if logit is set
-                must return log probs
-            else
-                must return action indices
         """
         if self.discrete_actions:
             raise NotImplementedError("Discrete actions are not handeled")
@@ -209,11 +204,11 @@ class Agent(AgentBase):
             bootstraping_return):
         # estimated_returns and bootstraping_return are scaled down
         # rewards are the raw rewards from the environment
+        rshape = rewards.shape[1:]
         if self.target_computation_params["type"] == "n_steps_strict":
             n_steps = self.target_computation_params["n_steps"]
             final_size = len(rewards) - n_steps + 1
             if final_size > 0:
-                rshape = rewards.shape[1:]
                 targets = np.zeros(shape=(final_size,) + rshape, dtype=np.float32)
                 targets[:-1] = estimated_returns[n_steps:]
                 targets[-1] = bootstraping_return
@@ -225,7 +220,6 @@ class Agent(AgentBase):
             return targets
         elif self.target_computation_params["type"] == "n_steps":
             n_steps = self.target_computation_params["n_steps"]
-            rshape = rewards.shape[1:]
             targets = np.zeros(shape=(len(rewards),) + rshape, dtype=np.float32)
             # strict part
             strict_size = len(rewards) - n_steps + 1
