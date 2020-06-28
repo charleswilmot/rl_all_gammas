@@ -186,11 +186,11 @@ class Agent(AgentBase):
             batch_weights=batch_weights
         )
         actor_loss = self.get_actor_loss(states, batch_weights=batch_weights)
-        if train_actor:
-            self.train_actor(states, batch_weights=batch_weights)
         if train_critic:
             self.train_critic(states, actions, target_returns,
                 batch_weights=batch_weights)
+        if train_actor:
+            self.train_actor(states, batch_weights=batch_weights)
         return critic_loss, actor_loss
 
     def rewards_to_target_returns(self, rewards, *args, **kwargs):
