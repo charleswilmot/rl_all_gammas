@@ -8,7 +8,8 @@ from return_viewer import ReturnViewer
 class Algorithm(object):
     def __init__(self, environment, agent, replay_buffer, training_steps=0,
             evaluate_every=0, train_every=100, batch_size=100,
-            make_critic_checkpoint=False, restore_from_checkpoint=None):
+            make_critic_checkpoint=False, restore_from_checkpoint=None,
+            train_noise_every=4, return_viewer=False):
         self.env = environment
         self.agent = agent
         self.replay_buffer = replay_buffer
@@ -17,6 +18,8 @@ class Algorithm(object):
         self.train_every = train_every
         self.batch_size = batch_size
         self.make_critic_checkpoint = make_critic_checkpoint
+        self.train_noise_every = train_noise_every
+        self.return_viewer = ReturnViewer() if return_viewer else False
         self.summary_writer = tf.summary.create_file_writer("logs")
         if restore_from_checkpoint is not False:
             self.restore_model(restore_from_checkpoint)
@@ -49,13 +52,12 @@ class OffPolicyAlgorithm(Algorithm):
     def __init__(self, environment, agent, replay_buffer, training_steps=0,
             evaluate_every=0, train_every=100, batch_size=100,
             make_critic_checkpoint=False, restore_from_checkpoint=None,
-            return_viewer=False):
+            train_noise_every=4, return_viewer=False):
         super(OffPolicyAlgorithm, self).__init__(
             environment, agent, replay_buffer, training_steps, evaluate_every,
             train_every, batch_size, make_critic_checkpoint,
-            restore_from_checkpoint
+            restore_from_checkpoint, train_noise_every, return_viewer
         )
-        self.return_viewer = ReturnViewer() if return_viewer else False
         self.episode_counter = tf.Variable(0, name="episode_counter")
         self.train_step_counter = tf.Variable(0, name="train_step")
         # self.global_step = self.train_step_counter
@@ -101,7 +103,19 @@ class OffPolicyAlgorithm(Algorithm):
             n_iterations_collected += self.collect_training_data()
             while n_done == 0 \
                     or n_iterations_collected / n_done > self.train_every:
-                self.train(train_actor=not self.make_critic_checkpoint)
+                if self.agent.noise_params["applied_on"] == "input":
+                    train_actor = not ((n_done + 1) % self.train_noise_every == 0)
+                    train_noise = not train_actor
+                else:
+                    train_actor = True
+                    train_noise = False
+                if self.make_critic_checkpoint:
+                    train_actor = False
+                    train_noise = False
+                self.train(
+                    train_actor=train_actor,
+                    train_noise=train_noise,
+                )
                 n_done += 1
                 if n_done % 100 == 0:
                     print("{: 6d}/{: 6d} training steps done".format(
@@ -166,19 +180,17 @@ class OffPolicyAlgorithm(Algorithm):
         self.testing_episode_length.reset_states()
         self.testing_total_episode_reward.reset_states()
 
-    def train(self, train_actor=True, train_critic=True):
+    def train(self, train_actor=True, train_critic=True, train_noise=False):
         # sample from buffer
         training_data = self.replay_buffer.sample(self.batch_size)
         # call agent.train
+        critic_loss, actor_loss = self.agent.train(
+            training_data,
+            train_actor=train_actor,
+            train_critic=train_critic,
+            train_noise=train_noise
+        )
         if self.replay_buffer.is_prioritized:
-            critic_loss, actor_loss = self.agent.train(
-                training_data["states"],
-                training_data["actions"],
-                training_data["targets"],
-                train_actor=train_actor,
-                train_critic=train_critic,
-                batch_weights=training_data["importance"]
-            )
             estimated_returns = self.agent.get_estimated_returns(
                 training_data["states"],
                 training_data["actions"],
@@ -189,14 +201,6 @@ class OffPolicyAlgorithm(Algorithm):
                 training_data["indices"],
                 priorities
             )
-        else:
-            critic_loss, actor_loss = self.agent.train(
-                training_data["states"],
-                training_data["actions"],
-                training_data["targets"],
-                train_actor=train_actor,
-                train_critic=train_critic
-            )
         self.train_step_counter.assign_add(1)
         # accumulate log data in keras metrics
         self.training_critic_loss(critic_loss)
@@ -204,33 +208,44 @@ class OffPolicyAlgorithm(Algorithm):
 
     def collect_training_data(self):
         # resent env
+        print("  collecting", end='\r')
         max_steps = self.env.spec.max_episode_steps
         shape = (max_steps, ) + self.env.observation_space.shape
-        states = np.zeros(shape=shape, dtype=self.env.observation_space.dtype)
+        states_b = np.zeros(shape=shape, dtype=self.env.observation_space.dtype)
+        if self.agent.noise_params["applied_on"] == "input":
+            noisy_states_b = np.zeros(
+                shape=(max_steps,) + self.agent.noisy_state_space_shape,
+                dtype=self.env.observation_space.dtype
+            )
         if self.env.action_space.dtype == np.int64:
             shape = (max_steps, self.env.action_space.n)
         else:
             shape = (max_steps, ) + self.env.action_space.shape
-        actions = np.zeros(shape=shape, dtype=np.float32)
-        rewards = np.zeros(shape=max_steps, dtype=np.float32)
-        estimated_returns = np.zeros(shape=max_steps, dtype=np.float32)
+        actions_b = np.zeros(shape=shape, dtype=np.float32)
+        rewards_b = np.zeros(shape=max_steps, dtype=np.float32)
+        estimated_returns_b = np.zeros(shape=max_steps, dtype=np.float32)
         state = self.env.reset()
         n_transitions = 0
         while True:
-            action = self.agent.get_actions(
-                state[np.newaxis].astype(np.float32),
-            )[0]
-            estimated_return = self.agent.get_estimated_returns(
-                state[np.newaxis].astype(np.float32),
-                action[np.newaxis],
+            states = state[np.newaxis].astype(np.float32)
+            policy_inputs = self.agent.get_policy_inputs(states, explore=True)
+            actions = self.agent.get_actions(policy_inputs, explore=True)
+            action = actions[0]
+            estimated_returns = self.agent.get_estimated_returns(
+                states,
+                actions,
                 mode=1
-            ).numpy()[0]
-            state, reward, done, _ = self.env.step(action.numpy())
+            ).numpy()
+            estimated_return = estimated_returns[0]
+            next_state, reward, done, _ = self.env.step(action.numpy())
             # store state action reward done in temp buffer
-            states[n_transitions] = state
-            actions[n_transitions] = action
-            rewards[n_transitions] = reward
-            estimated_returns[n_transitions] = estimated_return
+            states_b[n_transitions] = state
+            if self.agent.noise_params["applied_on"] == "input":
+                noisy_states_b[n_transitions] = policy_inputs[0]
+            actions_b[n_transitions] = action
+            rewards_b[n_transitions] = reward
+            estimated_returns_b[n_transitions] = estimated_return
+            state = next_state
             n_transitions += 1
             if done:
                 break
@@ -240,22 +255,32 @@ class OffPolicyAlgorithm(Algorithm):
             bootstraping_return = 0
         else:
             bootstraping_return = self.agent.get_bootstraping_return(
-                state[np.newaxis].astype(np.float32),  # enforce shape and type
+                states,
             ).numpy()[0]  # tensor to numpy
-        to_buffer = self.agent.get_buffer_data(
-            states=states[:n_transitions],
-            actions=actions[:n_transitions],
-            rewards=rewards[:n_transitions],
-            estimated_returns=estimated_returns[:n_transitions],
-            bootstraping_return=bootstraping_return
-        )
+        if self.agent.noise_params["applied_on"] == "input":
+            to_buffer = self.agent.get_buffer_data(
+                states=states_b[:n_transitions],
+                actions=actions_b[:n_transitions],
+                rewards=rewards_b[:n_transitions],
+                estimated_returns=estimated_returns_b[:n_transitions],
+                bootstraping_return=bootstraping_return,
+                noisy_states=noisy_states_b[:n_transitions]
+            )
+        else:
+            to_buffer = self.agent.get_buffer_data(
+                states=states_b[:n_transitions],
+                actions=actions_b[:n_transitions],
+                rewards=rewards_b[:n_transitions],
+                estimated_returns=estimated_returns_b[:n_transitions],
+                bootstraping_return=bootstraping_return,
+            )
         self.replay_buffer.register_episode(**to_buffer)
         # display return if needed
         targets = to_buffer["targets"]
         if self.return_viewer:
-            self.return_viewer(targets, estimated_returns[:n_transitions])
+            self.return_viewer(targets, estimated_returns_b[:n_transitions])
         # log signal to noise ratio
-        noise = targets - estimated_returns[:len(targets)]
+        noise = targets - estimated_returns_b[:len(targets)]
         signal_to_noise = 10 * (
             np.log10(np.var(targets)) - np.log10(np.var(noise))
         )
@@ -263,18 +288,20 @@ class OffPolicyAlgorithm(Algorithm):
         ########################################################################
         # must return number of iteration added to the buffer in order to ensure
         # that the correct number of weight update is performed
+        print("            ", end='\r')
         return n_transitions
 
-    def evaluate(self):
+    def evaluate(self, explore=False):
+        print("  evaluation", end='\r')
         state = self.env.reset()
         n_transitions = 0
         total_episode_reward = 0
         while True:
-            action = self.agent.get_actions(
-                state[np.newaxis].astype(np.float32),
-                explore=False,
-            )[0]
-            state, reward, done, _ = self.env.step(action.numpy())
+            states = state[np.newaxis].astype(np.float32)
+            policy_inputs = self.agent.get_policy_inputs(states, explore=explore)
+            actions = self.agent.get_actions(policy_inputs, explore=explore)
+            action = actions.numpy()[0]
+            state, reward, done, _ = self.env.step(action)
             n_transitions += 1
             total_episode_reward += reward
             if done:
@@ -282,3 +309,4 @@ class OffPolicyAlgorithm(Algorithm):
         self.testing_episode_length(n_transitions)
         self.testing_total_episode_reward(total_episode_reward)
         self.testing_mean_total_episode_reward(total_episode_reward)
+        print("            ", end='\r')

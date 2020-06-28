@@ -10,6 +10,10 @@ def get_environment(env_id, seed, monitor, outdir=None):
             video_callable = lambda episode_id: True
         elif monitor == "sometimes":
             video_callable = lambda episode_id: episode_id % 250 == 0
+        elif monitor == "sometimes_10":
+            video_callable = lambda episode_id: episode_id % 10 == 0
+        elif monitor == "sometimes_20":
+            video_callable = lambda episode_id: episode_id % 20 == 0
         else:
             raise ArgumentError(
                 "Monitor parameter not recognized ({})".foremat(monitor)
