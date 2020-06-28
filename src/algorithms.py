@@ -225,12 +225,13 @@ class OffPolicyAlgorithm(Algorithm):
                 action[np.newaxis],
                 mode=1
             ).numpy()[0]
-            state, reward, done, _ = self.env.step(action.numpy())
+            next_state, reward, done, _ = self.env.step(action.numpy())
             # store state action reward done in temp buffer
             states[n_transitions] = state
             actions[n_transitions] = action
             rewards[n_transitions] = reward
             estimated_returns[n_transitions] = estimated_return
+            state = next_state
             n_transitions += 1
             if done:
                 break
