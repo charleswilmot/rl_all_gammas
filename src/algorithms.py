@@ -251,12 +251,12 @@ class OffPolicyAlgorithm(Algorithm):
                 break
         self.training_episode_length(n_transitions)
         self.episode_counter.assign_add(1)
-        if done:  # and n_transitions < max_steps:
+        if done and n_transitions < max_steps:
             bootstraping_return = 0
         else:
             bootstraping_return = self.agent.get_bootstraping_return(
                 states,
-            ).numpy()[0]  # tensor to numpy
+            ).numpy()[0, 0]  # tensor to numpy
         if self.agent.noise_params["applied_on"] == "input":
             to_buffer = self.agent.get_buffer_data(
                 states=states_b[:n_transitions],
