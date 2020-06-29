@@ -5,8 +5,18 @@ from tensorflow import keras
 class KerasMLP(keras.Model):
     def __init__(self, *dimensions_activations):
         super(KerasMLP, self).__init__()
+        scale=4
+        initializer = keras.initializers.VarianceScaling(
+            scale=scale,
+            mode="fan_avg",
+            distribution="uniform",
+            seed=None
+        )
         self.denses = [
-            keras.layers.Dense(dim, activation=activation)
+            keras.layers.Dense(
+                dim,
+                activation=activation,
+                kernel_initializer=initializer)
             for dim, activation in dimensions_activations
         ]
 
@@ -62,6 +72,21 @@ class PolicyType3(KerasMLP):
         )
 
 
+class PolicyType4(KerasMLP):
+    def __init__(self, action_space_dim):
+        super(PolicyType4, self).__init__(
+            (100, tf.nn.relu),
+            (action_space_dim, tf.tanh)
+        )
+
+
+class PolicyType5(KerasMLP):
+    def __init__(self, action_space_dim):
+        super(PolicyType5, self).__init__(
+            (action_space_dim, tf.tanh)
+        )
+
+
 def get_critic_model(name):
     if name == "type1":
         return CriticType1()
@@ -78,5 +103,9 @@ def get_policy_model(name, action_space_dim):
         return PolicyType2(action_space_dim)
     if name == "type3":
         return PolicyType3(action_space_dim)
+    if name == "type4":
+        return PolicyType4(action_space_dim)
+    if name == "type5":
+        return PolicyType5(action_space_dim)
     else:
         raise ArgumentError("Unrecognized critic model name {}".format(name))
