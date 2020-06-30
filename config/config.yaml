@@ -3,8 +3,12 @@ agent:
   gamma: 0.995
   critic_learning_rate: 2e-3
   actor_learning_rate: 1e-4
-  policy_model: type1
-  critic_model: type1
+  policy_model:
+    type: type1
+    weight_init_scale: 1
+  critic_model:
+    type: type1
+    weight_init_scale: 1
   reward_scaling_factor: 100
   noise_params:
     type: normal

@@ -4,7 +4,8 @@ agent:
     type: ornstein_uhlenbeck
     stddev: 0.1
     ou_damping: 0.1
-  policy_model: type3
+  policy_model:
+    type: type2
 
 replay_buffer:
   alpha: 0.8

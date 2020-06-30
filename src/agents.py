@@ -46,8 +46,10 @@ class Agent(AgentBase):
             "actor_learning_rate": self.actor_learning_rate,
             "gamma": self.gamma,
             "reward_scaling_factor": self.reward_scaling_factor,
-            "policy_model": policy_model,
-            "critic_model": critic_model,
+            "policy_model_type": policy_model["type"],
+            "policy_model_scale": policy_model["weight_init_scale"],
+            "critic_model_type": critic_model["type"],
+            "critic_model_scale": critic_model["weight_init_scale"],
         }
         self._noise_params_to_hparams()
         self._target_computation_params_to_hparams()
