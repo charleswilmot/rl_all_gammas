@@ -95,6 +95,10 @@ class OffPolicyAlgorithm(Algorithm):
             "testing/mean_total_episode_reward",
             dtype=tf.float32
         )
+        self.testing_action_stddev = tf.keras.metrics.Mean(
+            "testing/action_stddev",
+            dtype=tf.float32
+        )
 
     def main_loop(self, training_steps, evaluate_every):
         n_done = 0
@@ -166,6 +170,11 @@ class OffPolicyAlgorithm(Algorithm):
                 self.testing_mean_total_episode_reward.result(),
                 step=step
             )
+            tf.summary.scalar(
+                self.testing_action_stddev.name,
+                self.testing_action_stddev.result(),
+                step=step
+            )
             hparams = {
                 **self.agent._hparams,
                 **self.replay_buffer._hparams,
@@ -179,6 +188,7 @@ class OffPolicyAlgorithm(Algorithm):
         self.training_critic_signal_to_noise.reset_states()
         self.testing_episode_length.reset_states()
         self.testing_total_episode_reward.reset_states()
+        self.testing_action_stddev.reset_states()
 
     def train(self, train_actor=True, train_critic=True, train_noise=False):
         # sample from buffer
@@ -294,9 +304,11 @@ class OffPolicyAlgorithm(Algorithm):
     def evaluate(self, explore=False):
         print("  evaluation", end='\r')
         state = self.env.reset()
+        states_b = np.zeros(shape=shape, dtype=self.env.observation_space.dtype)
         n_transitions = 0
         total_episode_reward = 0
         while True:
+            states_b[n_transitions] = state
             states = state[np.newaxis].astype(np.float32)
             policy_inputs = self.agent.get_policy_inputs(states, explore=explore)
             actions = self.agent.get_actions(policy_inputs, explore=explore)
@@ -306,6 +318,11 @@ class OffPolicyAlgorithm(Algorithm):
             total_episode_reward += reward
             if done:
                 break
+        if self.agent.noise_params["applied_on"] == "input":
+            size = min(10, n_transitions)
+            rnd_idx = np.random.choice(n_transitions, size, replace=False)
+            action_stddev = self.agent.measure_action_stddev(states_b[rnd_idx])
+            self.testing_action_stddev(action_stddev)
         self.testing_episode_length(n_transitions)
         self.testing_total_episode_reward(total_episode_reward)
         self.testing_mean_total_episode_reward(total_episode_reward)
