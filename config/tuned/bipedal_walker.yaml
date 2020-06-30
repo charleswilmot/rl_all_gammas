@@ -2,7 +2,7 @@ agent:
   reward_scaling_factor: 10
   noise_params:
     type: ornstein_uhlenbeck
-    stddev: 0.1
+    stddev: 0.23
     ou_damping: 0.1
   policy_model:
     type: type2

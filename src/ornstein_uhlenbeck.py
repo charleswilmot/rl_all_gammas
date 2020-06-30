@@ -17,7 +17,7 @@ class OUProcess(tf.Module):
     friction. This can be useful for exploration in continuous action
     environments with momentum.
     The temporal update equation is:
-    `x_next = (1 - damping) * x + N(0, std_dev)`
+    `x_next = (1 - damping) * x + N(0, std_dev * sqrt(damping * (2 - damping)))`
     Args:
       initial_value: Initial value of the process.
       damping: The rate at which the noise trajectory is damped towards the
@@ -39,7 +39,7 @@ class OUProcess(tf.Module):
   def __call__(self):
     noise = tf.random.normal(
         shape=self._x.shape,
-        stddev=self._stddev,
+        stddev=self._stddev * tf.sqrt(self._damping * (2 - self._damping)),
         dtype=self._x.dtype,
         seed=self._seed)
     return self._x.assign((1. - self._damping) * self._x + noise)
