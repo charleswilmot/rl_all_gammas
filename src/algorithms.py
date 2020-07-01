@@ -64,7 +64,8 @@ class OffPolicyAlgorithm(Algorithm):
         # self.global_step = self.episode_counter
         self._hparams = {
             "train_every": self.train_every,
-            "batch_size": self.batch_size
+            "batch_size": self.batch_size,
+            "train_noise_every": self.train_noise_every
         }
         # define a few metrics to keep track of
         self.training_episode_length = tf.keras.metrics.Mean(
