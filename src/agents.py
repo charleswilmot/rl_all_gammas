@@ -147,7 +147,10 @@ class Agent(AgentBase):
         assert(self.noise_params["applied_on"] == "input")
         states = tf.repeat(states, repeats=n, axis=0)
         batch_size = tf.shape(states)[:1]
-        additional_noise_shape = tf.concat([batch_size, self.input_noise_shape])
+        additional_noise_shape = tf.concat(
+            [batch_size, self.input_noise_shape],
+            axis=0
+        )
         noise = tf.random.normal(
             shape=additional_noise_shape,
             dtype=states.dtype,
@@ -162,7 +165,9 @@ class Agent(AgentBase):
             policy_inputs = self.augment_with_noise(states, n=10)
             actions = self.get_actions(policy_inputs)
             grouped_actions = tf.reshape(actions, (-1, 10, self.action_space_dim))
-            return tf.reduce_mean(tf.reduce_std(grouped_actions, axis=[1, 2]))
+            return tf.reduce_mean(
+                tf.math.reduce_std(grouped_actions, axis=[1, 2])
+            )
         else:
             return self.noise_params["stddev"]
 

@@ -304,6 +304,8 @@ class OffPolicyAlgorithm(Algorithm):
     def evaluate(self, explore=False):
         print("  evaluation", end='\r')
         state = self.env.reset()
+        max_steps = self.env.spec.max_episode_steps
+        shape = (max_steps, ) + self.env.observation_space.shape
         states_b = np.zeros(shape=shape, dtype=self.env.observation_space.dtype)
         n_transitions = 0
         total_episode_reward = 0
