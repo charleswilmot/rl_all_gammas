@@ -1,0 +1,13 @@
+################################################################################
+####                          CHECKPOINT                                    ####
+################################################################################
+
+At this point, the idea of applyiny noise on the input of the policy net rather
+than on the output is implemented.
+However, at the moment, the policy is trained on the states visited during
+exploration, deprived of the noise. I think it makes more sense to train the
+policy on the states visited during validation (ie no noise).
+This branch will implement that feature starting from the commit of this file.
+
+It implies minor changes, but I want to be able to easily find the right commit
+where I should come back to if I figure the new approach does not work better.
