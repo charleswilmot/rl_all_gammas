@@ -1,0 +1,21 @@
+agent:
+  reward_scaling_factor: 10
+  noise_params:
+    type: ornstein_uhlenbeck
+    stddev: 0.23
+    ou_damping: 0.1
+    applied_on: input
+    noise_dim: 1
+  policy_model:
+    type: type2
+
+replay_buffer:
+  alpha: 0.8
+  beta: 0.6
+
+environment:
+  env_id: BipedalWalker-v3
+
+algorithm:
+  training_steps: 30000
+  evaluation_exploration_ratio: 0.1
