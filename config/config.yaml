@@ -37,7 +37,7 @@ algorithm:
   training_steps: 10000
   evaluate_every: 10
   train_every: 128
-  train_noise_every: 4
+  evaluation_exploration_ratio: 1
   batch_size: 128
   make_critic_checkpoint: False
   restore_from_checkpoint: False

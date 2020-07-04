@@ -23,10 +23,10 @@ class Agent(AgentBase):
         else:
             self.action_space_dim = environment.action_space.shape[0]
         self.state_space_shape = environment.observation_space.shape
+        self.policy_input_shape = np.copy(self.state_space_shape)
         if noise_params["applied_on"] == "input":
-            self.noisy_state_space_shape = np.copy(self.state_space_shape)
-            self.noisy_state_space_shape[-1] += noise_params["noise_dim"]
-            self.noisy_state_space_shape = tuple(self.noisy_state_space_shape)
+            self.policy_input_shape[-1] += noise_params["noise_dim"]
+            self.policy_input_shape = tuple(self.policy_input_shape)
             self.input_noise_shape = np.copy(self.state_space_shape)
             self.input_noise_shape[-1] = noise_params["noise_dim"]
             self.input_noise_shape = tuple(self.input_noise_shape)
@@ -101,30 +101,26 @@ class Agent(AgentBase):
             ))
 
     @tf.function
-    def get_noisy_states(self, states, explore=True):
-        batch_dim = tf.shape(states)[:1]
-        if explore:
-            additional_noise_shape = (1,) + self.input_noise_shape  # for OUProc
-            noise = self.get_noise(additional_noise_shape)
-        else:
-            additional_noise_shape = tf.concat(
-                [batch_dim, self.input_noise_shape],
-                axis=0
-            )
-            noise = tf.zeros(
-                shape=additional_noise_shape,
-                dtype=states.dtype
-            )
-        return tf.concat([states, noise], axis=-1)
-
-    @tf.function
     def get_policy_inputs(self, states, explore=True):
         """Maps the states to the actions, depending on the values of
         self.discrete_actions and explore
         if explore is set, must add noise on the action
         """
         if self.noise_params["applied_on"] == "input":
-            return self.get_noisy_states(states, explore=explore)
+            batch_dim = tf.shape(states)[:1]
+            if explore:
+                additional_noise_shape = (1,) + self.input_noise_shape  # for OUProc
+                noise = self.get_noise(additional_noise_shape)
+            else:
+                additional_noise_shape = tf.concat(
+                    [batch_dim, self.input_noise_shape],
+                    axis=0
+                )
+                noise = tf.zeros(
+                    shape=additional_noise_shape,
+                    dtype=states.dtype
+                )
+            return tf.concat([states, noise], axis=-1)
         else:
             return states
 
@@ -161,6 +157,7 @@ class Agent(AgentBase):
 
     @tf.function
     def measure_action_stddev(self, states):
+        assert(self.noise_params["applied_on"] == "input")
         if self.noise_params["applied_on"] == "input":
             policy_inputs = self.augment_with_noise(states, n=10)
             actions = self.get_actions(policy_inputs)
@@ -172,12 +169,13 @@ class Agent(AgentBase):
             return self.noise_params["stddev"]
 
     @tf.function
-    def get_estimated_returns(self, states, actions, mode="minimum"):
+    def get_estimated_returns(self, policy_inputs, actions, mode="minimum"):
         # print("Tracing get_estimated_returns, {} {} {}".format(
         #     type(states),
         #     type(actions),
         #     mode)
         # )
+        states = self.clean_policy_inputs(policy_inputs)
         state_actions = tf.concat([states, actions], axis=-1)
         estimated_returns_1 = self.critic_model_1(state_actions)
         estimated_returns_2 = self.critic_model_2(state_actions)
@@ -191,17 +189,24 @@ class Agent(AgentBase):
             raise ArgumentError("Unrecognized return estimate mode")
 
     @tf.function
-    def get_bootstraping_return(self, states):
-        policy_inputs = self.get_policy_inputs(states, explore=False)
+    def get_bootstraping_return(self, policy_inputs):
         actions = self.get_actions(policy_inputs, explore=False)
-        return self.get_estimated_returns(states, actions)
+        return self.get_estimated_returns(policy_inputs, actions)
 
     @tf.function
-    def get_critic_loss(self, states, actions, target_returns,
+    def get_critic_loss(self, policy_inputs, actions, target_returns,
             batch_weights=None):
         target_returns = tf.reshape(target_returns, (-1, 1))
-        estimated_returns_1 = self.get_estimated_returns(states, actions, mode=1)
-        estimated_returns_2 = self.get_estimated_returns(states, actions, mode=2)
+        estimated_returns_1 = self.get_estimated_returns(
+            policy_inputs,
+            actions,
+            mode=1
+        )
+        estimated_returns_2 = self.get_estimated_returns(
+            policy_inputs,
+            actions,
+            mode=2
+        )
         h = keras.losses.Huber(delta=1.0, reduction='none')
         loss = h(target_returns, estimated_returns_1)
         loss += h(target_returns, estimated_returns_2)
@@ -210,25 +215,38 @@ class Agent(AgentBase):
         return tf.reduce_mean(loss) / 2
 
     @tf.function
-    def get_actor_loss(self, states, policy_inputs, batch_weights=None,
+    def clean_policy_inputs(self, states):
+        if self.noise_params["applied_on"] == "input":
+            slices = tuple(slice(0, s) for s in self.state_space_shape)
+            ret = states[(slice(None),) + slices]
+            return ret
+        else:
+            return states
+
+    @tf.function
+    def get_actor_loss(self, policy_inputs, batch_weights=None,
             explore=False):
         actions = self.get_actions(policy_inputs, explore=explore)
         if batch_weights is not None:
-            return - tf.reduce_mean(
-                self.get_estimated_returns(states, actions, mode=1)[:, 0] \
-                * batch_weights
+            return - tf.reduce_mean(self.get_estimated_returns(
+                    policy_inputs,
+                    actions,
+                    mode=1
+                )[:, 0] * batch_weights
             )
         else:
-            return - tf.reduce_mean(
-                self.get_estimated_returns(states, actions, mode=1)[:, 0]
+            return - tf.reduce_mean(self.get_estimated_returns(
+                    policy_inputs,
+                    actions,
+                    mode=1
+                )[:, 0]
             )
 
     @tf.function
-    def train_actor(self, states, policy_inputs, batch_weights=None):
+    def train_actor(self, policy_inputs, batch_weights=None):
         train_op_actor = self.actor_optimizer.minimize(
             lambda: \
                 self.get_actor_loss(
-                    states,
                     policy_inputs,
                     batch_weights=batch_weights
                 ),
@@ -236,11 +254,12 @@ class Agent(AgentBase):
         )
 
     @tf.function
-    def train_critic(self, states, actions, target_returns, batch_weights=None):
+    def train_critic(self, policy_inputs, actions, target_returns,
+            batch_weights=None):
         train_op_critic = self.critic_optimizer.minimize(
             lambda: \
                 self.get_critic_loss(
-                    states, actions, target_returns,
+                    policy_inputs, actions, target_returns,
                     batch_weights=batch_weights
                 ),
             var_list=lambda: \
@@ -248,83 +267,49 @@ class Agent(AgentBase):
                 self.critic_model_2.variables
         )
 
-    # @tf.function
-    # def train(self, states, actions, target_returns, train_actor=True,
-    #         train_critic=True, batch_weights=None):
-    #     critic_loss = self.get_critic_loss(
-    #         states,
-    #         actions,
-    #         target_returns,
-    #         batch_weights=batch_weights
-    #     )
-    #     actor_loss = self.get_actor_loss(states, batch_weights=batch_weights)
-    #     if train_critic:
-    #         self.train_critic(states, actions, target_returns,
-    #             batch_weights=batch_weights)
-    #     if train_actor:
-    #         self.train_actor(states, batch_weights=batch_weights)
-    #     return critic_loss, actor_loss
-
     def train(self, training_data, train_actor=True, train_critic=True,
             train_noise=False):
-        states = training_data["states"]
+        policy_inputs = training_data["policy_inputs"]
         actions = training_data["actions"]
         target_returns = training_data["targets"]
         if "importance" in training_data.dtype.fields.keys():
             batch_weights = training_data["importance"]
         else:
             batch_weights = None
-        if "noisy_states" in training_data.dtype.fields.keys():
-            noisy_states = training_data["noisy_states"]
-        else:
-            noisy_states = None
         return self.train_proxy(
-            states=states,
+            policy_inputs=policy_inputs,
             actions=actions,
             target_returns=target_returns,
             batch_weights=batch_weights,
-            noisy_states=noisy_states,
-            train_actor=True,
-            train_critic=True,
-            train_noise=False
+            train_actor=train_actor,
+            train_critic=train_critic
         )
 
     @tf.function
-    def train_proxy(self, states, actions,target_returns, batch_weights,
-            noisy_states, train_actor=True, train_critic=True,
-            train_noise=False):
-        policy_inputs = self.get_policy_inputs(states, explore=False)
+    def train_proxy(self, policy_inputs, actions, target_returns, batch_weights,
+            train_actor=True, train_critic=True):
         critic_loss = self.get_critic_loss(
-            states,
+            policy_inputs,
             actions,
             target_returns,
             batch_weights=batch_weights
         )
         actor_loss = self.get_actor_loss(
-            states,
             policy_inputs,
             batch_weights=batch_weights
         )
         if train_critic:
             self.train_critic(
-                states,
+                policy_inputs,
                 actions,
                 target_returns,
                 batch_weights=batch_weights
             )
         if train_actor:
-            if self.noise_params["applied_on"] == "input" and train_noise:
-                self.train_actor(
-                    states,
-                    noisy_states,
-                    batch_weights=batch_weights
-                )
-            else:
-                self.train_actor(
-                    states,
-                    policy_inputs,
-                    batch_weights=batch_weights
-                )
+            self.train_actor(
+                policy_inputs,
+                batch_weights=batch_weights
+            )
         return critic_loss, actor_loss
 
     def rewards_to_target_returns(self, rewards, *args, **kwargs):
@@ -389,10 +374,10 @@ class Agent(AgentBase):
                     self.target_computation_params["type"])
             )
 
-    def get_buffer_data(self, states, actions, rewards,
+    def get_buffer_data(self, policy_inputs, actions, rewards,
             estimated_returns, bootstraping_return, **others):
         # must return a dict
-        # some keys are mandatory: states, actions, targets, priorities
+        # some keys are mandatory: policy_inputs, actions, targets, priorities
         targets = self.rewards_to_target_returns(
             rewards,
             estimated_returns,
@@ -400,7 +385,7 @@ class Agent(AgentBase):
         )
         n = len(targets)
         ret = {}
-        ret["states"] = states[:n]
+        ret["policy_inputs"] = policy_inputs[:n]
         ret["actions"] = actions[:n]
         ret["targets"] = targets
         ret["priorities"] = np.abs(targets - estimated_returns[:n])
